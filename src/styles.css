@@ -382,3 +382,81 @@ input { user-select: text; -webkit-user-select: text; }
 @media (prefers-reduced-motion: reduce) {
   .card-inner, .flyer, .fan .card, .result, .turn-tag, .card.tap .face.back { animation: none !important; transition: none !important; }
 }
+
+/* =========================================================
+   CÁC GAME BÀI KHÁC
+   ========================================================= */
+.game-pick { display: flex; flex-wrap: wrap; gap: 6px; }
+.game-pick button {
+  flex: 1 1 auto; padding: 8px 10px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .12);
+  background: rgba(255, 255, 255, .04); color: var(--muted); font-weight: 700; font-size: 13px; white-space: nowrap;
+}
+.game-pick button.on { background: var(--gold); color: #2a1c06; border-color: var(--gold); }
+.game-pick button:disabled:not(.on) { opacity: .5; }
+.seg.rounds { align-items: center; }
+.seg.rounds span { color: var(--muted); font-size: 13px; font-weight: 700; margin-right: 4px; white-space: nowrap; }
+.pill.game-name { color: var(--gold); font-weight: 800; border-color: var(--line); }
+.rules { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; line-height: 1.5; font-size: 14px; color: var(--ivory); }
+
+.phase-tag {
+  font-size: 13px; font-weight: 800; color: var(--ivory); background: rgba(0, 0, 0, .45);
+  padding: 4px 12px; border-radius: 999px; border: 1px solid rgba(224, 189, 99, .3); text-align: center;
+}
+.phase-tag.gold { color: #2a1c06; background: var(--gold); }
+.big-delta { display: flex; flex-direction: column; align-items: center; font-size: 30px; font-weight: 800; animation: pop .4s cubic-bezier(.2, 1.4, .4, 1); }
+.big-delta small { font-size: 12px; color: var(--muted); }
+.delta { font-weight: 800; font-size: 12px; }
+.delta.up { color: #52e08a; } .delta.down { color: #ff7a70; } .delta.zero { color: var(--muted); }
+.big-delta .delta { font-size: 30px; }
+.dealer.cai { width: auto; padding: 0 5px; border-radius: 8px; background: linear-gradient(180deg, #f3d98c, var(--gold)); color: #2a1c06; font-size: 10px; }
+.role { color: var(--gold) !important; font-size: 13px !important; }
+.center-info { align-items: center; }
+.seat-cards.stack { align-items: center; gap: 4px; }
+.seat-cards .count { font-weight: 800; font-size: 13px; color: var(--ivory); background: rgba(0, 0, 0, .6); border-radius: 999px; padding: 1px 7px; }
+.away-bar { position: fixed; left: 0; right: 0; bottom: calc(10px + var(--safe-b)); display: flex; justify-content: center; z-index: 25; }
+
+/* Tiến lên */
+.tl-center { gap: 6px; width: 54%; }
+.trick { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; max-width: 100%; }
+.trick .card.md { margin-left: -18px; } .trick .card.md:first-child { margin-left: 0; }
+.trick { flex-wrap: nowrap; }
+.chop-banner {
+  position: absolute; left: 50%; top: 32%; transform: translate(-50%, -50%) rotate(-6deg); z-index: 8; pointer-events: none;
+  font-size: 34px; font-weight: 800; color: #fff; text-align: center; line-height: 1;
+  text-shadow: 0 0 20px #ff3b30, 0 4px 0 #8a1f1b; animation: chop 2.2s ease-out forwards;
+}
+.chop-banner small { display: block; font-size: 14px; color: var(--gold); text-shadow: 0 2px 6px #000; margin-top: 4px; }
+@keyframes chop { 0% { transform: translate(-50%, -50%) rotate(-6deg) scale(2.4); opacity: 0; } 12% { transform: translate(-50%, -50%) rotate(-6deg) scale(1); opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+.tl-top { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 14px; }
+.tl-top b { color: var(--gold); }
+.tl-top .ok { color: #52e08a; font-weight: 700; } .tl-top .bad { color: #ff8a80; font-weight: 700; }
+.tl-top .hint { color: var(--muted); }
+.hand-fan { display: flex; justify-content: center; padding: 14px 0 2px; min-height: 76px; }
+.hand-fan .card { margin-left: calc(min(-14px, (100vw - 60px) / var(--n) - 40px)); transition: transform .15s; }
+.hand-fan .card:first-child { margin-left: 0; }
+.hand-fan .card.picked, .mb-cards .card.picked { transform: translateY(-14px); }
+.hand-fan .card.picked .face.front, .mb-cards .card.picked .face.front { box-shadow: 0 0 0 2px var(--gold), 0 6px 14px rgba(0, 0, 0, .5); }
+
+/* Mậu binh */
+.small-felt .felt { max-height: 300px; }
+.mb-bar { gap: 6px; }
+.mb-rows { display: flex; flex-direction: column; gap: 6px; }
+.mb-row { display: grid; grid-template-columns: 74px 1fr; align-items: center; gap: 6px; }
+.mb-label { display: flex; flex-direction: column; line-height: 1.2; }
+.mb-label b { font-size: 13px; color: var(--gold); }
+.mb-label span { font-size: 11px; color: var(--ivory); }
+.mb-cards { display: flex; gap: 3px; }
+.mb-cards .card { transition: transform .15s; }
+.mb-special { margin: 0; text-align: center; color: var(--gold); font-size: 13px; }
+.mb-result .mb-player { padding: 10px; border-radius: 12px; background: rgba(255, 255, 255, .04); display: flex; flex-direction: column; gap: 4px; }
+.mb-result .mb-player.me { border: 1px solid rgba(224, 189, 99, .5); }
+.mb-head { display: flex; align-items: center; gap: 8px; }
+.mb-head b { flex: 1; }
+.tag { font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 6px; }
+.tag.gold { background: var(--gold); color: #2a1c06; } .tag.bad { background: rgba(196, 48, 43, .3); color: #ffb4ae; }
+.mb-mini { display: flex; align-items: center; gap: 8px; }
+.mini-cards { display: flex; gap: 2px; }
+.mb-mini small { color: var(--muted); font-size: 12px; }
+.vs { margin: 2px 0 0; font-size: 13px; color: var(--ivory); }
+.vs em { color: var(--muted); }
+@media (min-width: 760px) { .small-felt .felt { max-height: 360px; } }

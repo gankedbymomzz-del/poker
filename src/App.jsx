@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { call, loadPlayer, savePlayer, loadRoom, saveRoom } from './lib/api.js';
 import { unlock } from './lib/sfx.js';
 import Card from './Card.jsx';
-import BotGame from './BotGame.jsx';
+import PracticeGame from './PracticeGame.jsx';
+import { GAME_LIST, gameOf } from '../engine/games/index.js';
 import OnlineGame from './OnlineGame.jsx';
 
 // Màn hình chính: ghi danh → thành tích → tạo bàn / vào bàn / luyện tập với máy
@@ -12,7 +13,8 @@ export default function App() {
   const [room, setRoom] = useState(null);
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
-  const [bots, setBots] = useState(5);
+  const [bots, setBots] = useState(3);
+  const [ptype, setPtype] = useState('poker');
   const [fast, setFast] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -70,7 +72,7 @@ export default function App() {
 
   const exit = (note) => { setScreen('home'); setRoom(null); if (typeof note === 'string') setMsg(note); };
 
-  if (screen === 'bots') return <BotGame name={player?.name || 'Bạn'} bots={bots} fast={fast} onExit={exit} />;
+  if (screen === 'bots') return <PracticeGame type={ptype} name={player?.name || 'Bạn'} bots={bots} fast={fast} onExit={exit} />;
   if (screen === 'online' && room) return <OnlineGame initial={room} onExit={exit} />;
 
   return (
@@ -83,9 +85,9 @@ export default function App() {
           <Card c="Jc" size="lg" className="f4" />
           <Card c="Ts" size="lg" className="f5" />
         </div>
-        <p className="kicker">Texas Hold'em · Sit &amp; Go</p>
-        <h1>Poker <span>Nhà Số 7</span></h1>
-        <p className="lead">2–6 người một bàn, 1.500 chip ảo mỗi người, blind tăng dần. Người cuối cùng còn chip là vô địch.</p>
+        <p className="kicker">Poker · Bài cào · Xì dách · Tiến lên · Mậu binh</p>
+        <h1>Sòng bài <span>Nhà Số 7</span></h1>
+        <p className="lead">Tạo bàn, gửi mã cho bạn bè, chọn game và chơi cùng nhau. Chip ảo, chỉ để giải trí.</p>
       </div>
 
       {!player ? (
@@ -130,19 +132,31 @@ export default function App() {
 
           <div className="panel">
             <h2>Luyện tập với máy</h2>
+            <div className="game-pick">
+              {GAME_LIST.map((m) => (
+                <button key={m.id} className={ptype === m.id ? 'on' : ''}
+                  onClick={() => { setPtype(m.id); setBots((b) => Math.min(b, m.max - 1)); }}>
+                  {m.name.replace("Poker Texas Hold'em", 'Poker')}
+                </button>
+              ))}
+            </div>
             <div className="field">
               <span>Số người chơi máy</span>
               <div className="seg">
-                {[1, 2, 3, 4, 5].map((n) => <button key={n} className={bots === n ? 'on' : ''} onClick={() => setBots(n)}>{n}</button>)}
+                {Array.from({ length: gameOf(ptype).meta.max - 1 }, (_, i) => i + 1).map((n) => (
+                  <button key={n} className={bots === n ? 'on' : ''} onClick={() => setBots(n)}>{n}</button>
+                ))}
               </div>
             </div>
-            <div className="field">
-              <span>Tăng blind</span>
-              <div className="seg">
-                <button className={!fast ? 'on' : ''} onClick={() => setFast(false)}>6 phút</button>
-                <button className={fast ? 'on' : ''} onClick={() => setFast(true)}>1 phút</button>
+            {ptype === 'poker' && (
+              <div className="field">
+                <span>Tăng blind</span>
+                <div className="seg">
+                  <button className={!fast ? 'on' : ''} onClick={() => setFast(false)}>6 phút</button>
+                  <button className={fast ? 'on' : ''} onClick={() => setFast(true)}>1 phút</button>
+                </div>
               </div>
-            </div>
+            )}
             <button className="btn" onClick={() => setScreen('bots')}>Vào bàn luyện tập</button>
           </div>
         </>

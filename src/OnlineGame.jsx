@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { call, saveRoom } from './lib/api.js';
 import { subscribeRoom } from './lib/realtime.js';
-import Table, { FinalBoard, seatPos } from './Table.jsx';
+import { seatPos } from './Table.jsx';
+import GameView from './games/GameView.jsx';
+import { FinalBoardAny } from './games/shared.jsx';
+import { GAME_LIST, gameOf } from '../engine/games/index.js';
+
+const ROUND_OPTS = [4, 8, 12];
 
 // Chơi phòng: máy chủ giữ bài, điện thoại chỉ nhận phần mình được xem
 export default function OnlineGame({ initial, onExit }) {
@@ -31,10 +36,8 @@ export default function OnlineGame({ initial, onExit }) {
     try { apply((await call(action, { code, ...extra })).room); } catch (e) { setErr(e.message); throw e; } finally { setBusy(false); }
   };
 
-  // Đồng hồ hiển thị
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, []);
 
-  // Nghe tín hiệu thời gian thực
   useEffect(() => {
     let off = () => {};
     let alive = true;
@@ -42,7 +45,6 @@ export default function OnlineGame({ initial, onExit }) {
     return () => { alive = false; off(); };
   }, [code]);
 
-  // Dự phòng: hỏi lại định kỳ (nhanh hơn nếu thời gian thực chưa kết nối được)
   useEffect(() => {
     const ms = live === 'SUBSCRIBED' ? 6000 : 2000;
     const t = setInterval(() => { if (!document.hidden) refresh(); }, ms);
@@ -50,14 +52,17 @@ export default function OnlineGame({ initial, onExit }) {
   }, [live, code]);
 
   // Hẹn giờ đánh thức máy chủ: lúc có người hết giờ, lúc chia ván mới
+  const g = room.game;
+  const G = gameOf(room.type);
+  const deadline = g ? (g.deadline ?? g.hand?.deadline) : null;
+  const roundDone = g && !g.finished && G.roundDone(g);
   useEffect(() => {
-    const g = room.game;
     if (!g || g.finished) return undefined;
     const srvNow = Date.now() + offset.current;
-    const wake = g.hand.street === 'done' ? (room.doneAt || srvNow) + room.nextHandMs + 150 : (g.hand.deadline || srvNow) + 300;
+    const wake = roundDone ? (room.doneAt || srvNow) + room.nextHandMs + 150 : (deadline || srvNow + 5000) + 300;
     const t = setTimeout(refresh, Math.max(200, wake - srvNow));
     return () => clearTimeout(t);
-  }, [room.version, room.game?.hand?.deadline, room.doneAt]);
+  }, [room.version, deadline, room.doneAt, roundDone]);
 
   const leave = async () => {
     try { await call('leave', { code }); } catch { /* bỏ qua */ }
@@ -78,6 +83,9 @@ export default function OnlineGame({ initial, onExit }) {
   if (room.status === 'lobby') {
     const seated = room.seats.filter(Boolean).length;
     const ref = room.mySeat >= 0 ? room.mySeat : 0;
+    const meta = G.meta;
+    const tooMany = seated > meta.max;
+    const tooFew = seated < meta.min;
     return (
       <div className="room">
         <header className="top">{header}</header>
@@ -86,7 +94,7 @@ export default function OnlineGame({ initial, onExit }) {
             <div className="center lobby-center">
               <p className="kicker">Mã bàn</p>
               <button className="code" onClick={() => navigator.clipboard?.writeText(code)} title="Chạm để sao chép">{code}</button>
-              <p className="lead small">Gửi mã cho bạn bè. Chạm ghế trống để đổi chỗ.</p>
+              <p className="lead small">{meta.name} · {meta.min}–{meta.max} người</p>
             </div>
             {room.seats.map((s, t) => (
               <div key={t} className={`seat lobby ${t === room.mySeat ? 'mine' : ''}`} style={seatPos((t - ref + 6) % 6, 6)}>
@@ -103,29 +111,46 @@ export default function OnlineGame({ initial, onExit }) {
           </div>
         </div>
         <footer className="me-bar">
+          <div className="game-pick">
+            {GAME_LIST.map((m) => (
+              <button key={m.id} className={room.type === m.id ? 'on' : ''} disabled={!room.isHost || busy}
+                onClick={() => doCall('setgame', { type: m.id, rounds: room.rounds }).catch(() => {})}>
+                {m.name.replace("Poker Texas Hold'em", 'Poker')}
+              </button>
+            ))}
+          </div>
+          {meta.scoring !== 'chip' || room.type !== 'poker' ? (
+            room.type !== 'poker' && (
+              <div className="seg rounds">
+                <span>Số ván</span>
+                {ROUND_OPTS.map((r) => (
+                  <button key={r} className={(room.rounds || meta.defaultRounds) === r ? 'on' : ''} disabled={!room.isHost || busy}
+                    onClick={() => doCall('setgame', { type: room.type, rounds: r }).catch(() => {})}>{r}</button>
+                ))}
+              </div>
+            )
+          ) : null}
           {room.isHost ? (
-            <button className="btn gold big" disabled={busy || seated < 2} onClick={() => doCall('start').catch(() => {})}>
-              {seated < 2 ? 'Cần ít nhất 2 người' : `Bắt đầu giải (${seated} người)`}
+            <button className="btn gold big" disabled={busy || tooFew || tooMany} onClick={() => doCall('start').catch(() => {})}>
+              {tooFew ? `Cần ít nhất ${meta.min} người` : tooMany ? `${meta.name} tối đa ${meta.max} người` : `Bắt đầu (${seated} người)`}
             </button>
-          ) : <p className="waiting">Chờ chủ bàn bắt đầu…</p>}
+          ) : <p className="waiting">Chờ chủ bàn chọn game và bắt đầu…</p>}
           {err && <p className="err">{err}</p>}
-          <p className="note">1.500 chip mỗi người · blind 10/20 tăng mỗi 6 phút · 20 giây mỗi lượt</p>
+          <p className="note">{meta.rules[0]}</p>
         </footer>
       </div>
     );
   }
 
   // ---------- Đang chơi / kết thúc ----------
-  const g = room.game;
   const ref = room.mySeat >= 0 ? room.mySeat : 0;
   const amAway = room.mySeat >= 0 && room.seats[room.mySeat]?.away;
-  const viewGame = {
-    ...g,
-    seats: g.seats.map((s, i) => ({ ...s, awayTag: !!room.seats[room.map[i]]?.away && !s.out })),
-  };
+  const viewGame = room.type === 'poker'
+    ? { ...g, seats: g.seats.map((s, i) => ({ ...s, awayTag: !!room.seats[room.map[i]]?.away && !s.out })) }
+    : g;
   return (
     <>
-      <Table
+      <GameView
         game={viewGame}
         me={room.myEngine}
         layout={(i) => ({ k: (room.map[i] - ref + 6) % 6, n: 6 })}
@@ -134,12 +159,13 @@ export default function OnlineGame({ initial, onExit }) {
         away={amAway}
         onAct={(a) => doCall('act', a)}
         headerExtra={header}
-        footerNote={amAway ? (
-          <button className="btn gold" onClick={() => doCall('back').catch(() => {})}>Quay lại bàn</button>
-        ) : err ? <p className="err">{err}</p> : null}
+        footerNote={amAway ? <button className="btn gold" onClick={() => doCall('back').catch(() => {})}>Quay lại bàn</button> : err ? <p className="err">{err}</p> : null}
       />
+      {amAway && room.type !== 'poker' && (
+        <div className="away-bar"><button className="btn gold" onClick={() => doCall('back').catch(() => {})}>Quay lại bàn</button></div>
+      )}
       {g.finished && (
-        <FinalBoard
+        <FinalBoardAny
           game={g}
           onAgain={room.isHost ? () => doCall('restart').catch(() => {}) : null}
           againLabel="Mở giải mới cùng bàn"

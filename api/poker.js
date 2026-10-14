@@ -1,6 +1,6 @@
-// ====== API BÀN POKER NHIỀU NGƯỜI ======
-// POST /api/poker { action, name, token, code?, seat?, type?, to? }
-// action: register | me | leaders | create | join | state | sit | start | act | leave | back | restart
+// ====== API BÀN CHƠI NHIỀU NGƯỜI (Poker, Bài cào, Xì dách, Tiến lên, Mậu binh) ======
+// POST /api/poker { action, name, token, code?, seat?, ...hành động của game }
+// action: register | me | leaders | create | join | state | sit | setgame | start | act | leave | back | restart
 // GET  /api/poker?action=config → địa chỉ + khoá công khai Supabase cho điện thoại nghe tín hiệu
 //
 // Nguyên tắc: máy chủ nắm toàn bộ trạng thái (kể cả bộ bài), mỗi người chỉ nhận phần mình được xem.
@@ -9,10 +9,12 @@ import {
   hasDb, publicConfig, getUser, insertUser, getRoom, insertRoom, saveRoom, cleanupRooms, rpc, getStats, topPlayers,
   NAME_RE, cleanName, keyOf, hash, serverRng,
 } from './_lib/db.js';
-import { createGame, startHand, act, publicView } from '../engine/game.js';
+import { gameOf, GAMES } from '../engine/games/index.js';
 
 const SEATS = 6;
-const NEXT_HAND_MS = 4000; // nghỉ giữa 2 ván để mọi người xem kết quả
+// Nghỉ giữa 2 ván để mọi người xem kết quả (Mậu binh cần lâu hơn để so chi)
+const NEXT_MS = { poker: 4000, baicao: 6000, xidach: 6000, tienlen: 7000, maubinh: 12000 };
+const nextMs = (type) => NEXT_MS[type] || 5000;
 const SETTINGS = { startStack: 1500, levelMs: 6 * 60 * 1000, actionMs: 20000 };
 
 const send = (res, status, data) => res.status(status).json(data);
@@ -27,29 +29,39 @@ async function auth(b) {
   return { key, name: u.name };
 }
 
-const newState = (host) => ({ host, seats: Array(SEATS).fill(null), game: null, map: [], doneAt: null, finishedAt: null, settings: SETTINGS });
+const newState = (host) => ({ host, type: 'poker', rounds: null, seats: Array(SEATS).fill(null), game: null, map: [], doneAt: null, finishedAt: null, settings: SETTINGS });
 const statusOf = (st) => (!st.game ? 'lobby' : st.game.finished ? 'finished' : 'playing');
 
-// Tự chạy tiếp bàn: người hết giờ, người đã rời bàn, chia ván mới
+// Tự chạy tiếp bàn: người hết giờ, người đã rời bàn, chia ván mới — dùng chung cho mọi game
 function progress(st, now) {
+  const G = gameOf(st.type);
   let changed = false;
-  for (let guard = 0; st.game && !st.game.finished && guard < 60; guard += 1) {
-    const h = st.game.hand;
-    if (h.street === 'done') {
+  for (let guard = 0; st.game && !st.game.finished && guard < 80; guard += 1) {
+    if (G.roundDone(st.game)) {
       if (!st.doneAt) { st.doneAt = now; changed = true; break; }
-      if (now - st.doneAt < NEXT_HAND_MS) break;
-      st.game = startHand(st.game, now, serverRng());
+      if (now - st.doneAt < nextMs(st.type)) break;
+      st.game = G.startRound(st.game, now, serverRng());
       st.doneAt = null;
       changed = true;
       continue;
     }
-    const t = h.toAct;
-    if (t == null) break;
-    const away = st.seats[st.map[t]]?.away;
-    if (!away && now < h.deadline) break;
-    st.game = act(st.game, t, { type: 'timeout' }, now);
-    if (st.game.hand.street === 'done') st.doneAt = now;
-    changed = true;
+    // Người đã rời bàn: máy tự hành động thay ngay
+    const away = st.game.seats.findIndex((_, i) => st.seats[st.map[i]]?.away && G.legal(st.game, i));
+    if (away >= 0) {
+      st.game = G.act(st.game, away, { type: 'timeout' }, now);
+      if (G.roundDone(st.game)) st.doneAt = now;
+      changed = true;
+      continue;
+    }
+    // Hết giờ
+    const t = G.tick(st.game, now);
+    if (t !== st.game) {
+      st.game = t;
+      if (G.roundDone(t)) st.doneAt = now;
+      changed = true;
+      continue;
+    }
+    break;
   }
   if (st.game?.finished && !st.finishedAt) { st.finishedAt = now; changed = true; }
   return changed;
@@ -86,11 +98,12 @@ function view(row, meKey, now) {
   const myEngine = mySeat >= 0 ? st.map.indexOf(mySeat) : -1;
   return {
     code: row.code, version: row.version, status: statusOf(st), now,
+    type: st.type || 'poker', rounds: st.rounds || null,
     host: st.host, isHost: st.host === meKey,
     seats: st.seats.map((s) => s && { key: s.key, name: s.name, away: !!s.away }),
     map: st.map, mySeat, myEngine,
-    doneAt: st.doneAt, nextHandMs: NEXT_HAND_MS, settings: st.settings,
-    game: st.game ? publicView(st.game, myEngine) : null,
+    doneAt: st.doneAt, nextHandMs: nextMs(st.type), settings: st.settings,
+    game: st.game ? gameOf(st.type).view(st.game, myEngine) : null,
   };
 }
 
@@ -176,16 +189,31 @@ export default async function handler(req, res) {
         });
         break;
 
+      case 'setgame':
+        row = await mutate(code, (st) => {
+          if (st.host !== me.key) throw httpErr(403, 'Chỉ chủ bàn mới chọn game được');
+          if (st.game && !st.game.finished) throw httpErr(409, 'Giải đang diễn ra');
+          if (!GAMES[b.type]) throw httpErr(400, 'Game không hợp lệ');
+          st.type = b.type;
+          const r = Number(b.rounds);
+          st.rounds = Number.isInteger(r) && r >= 1 && r <= 50 ? r : null;
+          return true;
+        });
+        break;
+
       case 'start':
         row = await mutate(code, (st) => {
           if (st.host !== me.key) throw httpErr(403, 'Chỉ chủ bàn mới bắt đầu được');
           if (st.game && !st.game.finished) throw httpErr(409, 'Giải đang diễn ra');
+          const G = gameOf(st.type);
           const map = st.seats.map((s, i) => (s && !s.away ? i : -1)).filter((i) => i >= 0);
-          if (map.length < 2) throw httpErr(409, 'Cần ít nhất 2 người ngồi vào bàn');
+          if (map.length < G.meta.min) throw httpErr(409, `${G.meta.name} cần ít nhất ${G.meta.min} người`);
+          if (map.length > G.meta.max) throw httpErr(409, `${G.meta.name} chỉ chơi tối đa ${G.meta.max} người, mời bớt người đứng dậy`);
           const players = map.map((i) => ({ id: st.seats[i].key, name: st.seats[i].name }));
-          const g = createGame({ players, ...st.settings, now });
+          const options = st.type === 'poker' ? { ...st.settings } : { rounds: st.rounds || G.meta.defaultRounds };
+          const g = G.create({ players, now, options });
           st.map = map;
-          st.game = startHand(g, now, serverRng());
+          st.game = G.startRound(g, now, serverRng());
           st.doneAt = null;
           st.finishedAt = null;
           return true;
@@ -197,10 +225,12 @@ export default async function handler(req, res) {
           if (!st.game || st.game.finished) throw httpErr(409, 'Bàn chưa chơi');
           const mine = st.map.indexOf(seatOf(st));
           if (mine < 0) throw httpErr(403, 'Bạn không ngồi trong giải này');
+          const G = gameOf(st.type);
           progress(st, now); // xử lý người hết giờ trước
-          if (st.game.hand.street === 'done' || st.game.hand.toAct !== mine) throw httpErr(409, 'Chưa tới lượt bạn');
-          st.game = act(st.game, mine, { type: b.type, to: b.to }, now);
-          if (st.game.hand.street === 'done') st.doneAt = now;
+          if (st.game.finished || !G.legal(st.game, mine)) throw httpErr(409, 'Chưa tới lượt bạn');
+          const { action: _a, name: _n, token: _t, code: _c, ...move } = b;
+          st.game = G.act(st.game, mine, move, now);
+          if (G.roundDone(st.game)) st.doneAt = now;
           progress(st, now); // người đã rời bàn tự bỏ bài ngay
           return true;
         });

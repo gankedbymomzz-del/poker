@@ -2,7 +2,36 @@
 
 Texas Hold'em No-Limit, thể thức Sit & Go cho 2–6 người. Chip ảo, chỉ để giải trí.
 
-**Trạng thái: Bước 3/3 (đợt 1) — Thành tích, giao diện mới, chia bài và lật bài.**
+**Trạng thái: Sòng bài 5 game — Poker, Bài cào 3 lá, Xì dách, Tiến lên miền Nam, Mậu binh.**
+
+---
+
+## Cập nhật: 5 game bài
+
+Không cần chạy thêm SQL. Chỉ cần upload thư mục mới lên GitHub.
+
+**Cách chơi:** tạo bàn như cũ → ở phòng chờ, **chủ bàn chọn game và số ván** → Bắt đầu. Hết giải, chủ bàn có thể đổi sang game khác cho ván sau.
+
+| Game | Số người | Thể thức | Tính |
+|---|---|---|---|
+| Poker Texas Hold'em | 2–6 | Sit & Go, loại trực tiếp | Chip |
+| Bài cào 3 lá | 2–6 | Nhà cái xoay vòng, đặt cược ×1–×3, nặn bài | Chip |
+| Xì dách | 2–6 | Nhà cái xoay vòng, rút/dằn | Chip |
+| Tiến lên miền Nam | 2–4 | 13 lá, chặt heo, tới trắng | Điểm |
+| Mậu binh | 2–4 | Xếp 3 chi, so chi, sập hầm, binh lủng | Điểm (chi) |
+
+Mỗi bàn có nút **Luật chơi** giải thích chi tiết luật đang dùng. Luyện tập với máy có đủ 5 game.
+
+### Luật đã chọn (có thể chỉnh trong `engine/games/<tên game>.js`)
+
+- **Bài cào:** điểm = tổng nút lấy hàng đơn vị, 3 Tây lớn nhất và ăn gấp đôi, bằng điểm thì hoà.
+- **Xì dách:** Xì bàng > Xì dách > Ngũ linh > điểm. Con dưới 16 không được dằn, nhà cái dưới 15 phải rút. Quắc gặp quắc thì hoà. Xì bàng, Xì dách, Ngũ linh ăn gấp đôi.
+- **Tiến lên:** 3 đôi thông/tứ quý chặt 1 heo; tứ quý/4 đôi thông chặt đôi heo. Heo đen 1 điểm, heo đỏ 2 điểm. Tới trắng: tứ quý heo, sảnh rồng, 6 đôi, 5 đôi thông. Điểm 4 người: +3, +1, −1, −3.
+- **Mậu binh:** binh lủng thua 6 chi mỗi người. Sập hầm nhân đôi. Thưởng chi: chi đầu sám ×3; chi giữa cù lũ ×2, tứ quý ×8, thùng phá sảnh ×10; chi cuối tứ quý ×4, thùng phá sảnh ×5. Tới trắng: sảnh rồng, 6 đôi.
+
+### Kiểm thử
+
+`npm test` chạy 39 kiểm thử: luật từng game, chặt heo, binh lủng, sập hầm, Át trong xì dách, và giả lập 60 giải đấu mỗi game giữa các bot để kiểm tra chip/điểm luôn bảo toàn.
 
 ---
 
@@ -107,6 +136,7 @@ poker/
 │   ├── evaluate.js         # Chấm điểm bài, tên bài tiếng Việt
 │   ├── pots.js             # Hũ chính, hũ phụ, chia chip lẻ
 │   ├── game.js             # Máy cược No-Limit, lượt nói, loại người chơi, tăng blind
+│   ├── games/              # Khuôn chung + luật Bài cào, Xì dách, Tiến lên, Mậu binh
 │   ├── bots.js             # Người chơi máy
 │   └── tests/              # 23 kiểm thử + giả lập hàng nghìn ván
 ├── api/
@@ -115,7 +145,8 @@ poker/
 ├── src/
 │   ├── App.jsx             # Màn hình chính
 │   ├── OnlineGame.jsx      # Chơi phòng: phòng chờ, bàn chơi, nghe tín hiệu
-│   ├── BotGame.jsx         # Luyện tập với máy
+│   ├── PracticeGame.jsx    # Luyện tập với máy (cả 5 game)
+│   ├── games/              # Bàn chơi từng game: DealerTable, TienLenTable, MauBinhTable
 │   └── Table.jsx           # Bàn chơi dùng chung cho cả 2 chế độ
 └── vercel.json             # Đặt máy chủ ở Tokyo
 ```
