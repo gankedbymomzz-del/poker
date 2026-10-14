@@ -12,7 +12,6 @@ const ROUND_OPTS = [4, 8, 12];
 // Chơi phòng: máy chủ giữ bài, điện thoại chỉ nhận phần mình được xem
 export default function OnlineGame({ initial, invite, onExit }) {
   const [room, setRoom] = useState(initial);
-  const [now, setNow] = useState(Date.now());
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [live, setLive] = useState('connecting');
@@ -27,7 +26,7 @@ export default function OnlineGame({ initial, invite, onExit }) {
   const apply = useCallback((r) => {
     if (!r) return;
     offset.current = r.now - Date.now();
-    if (!roomRef.current || r.version >= roomRef.current.version) { roomRef.current = r; setRoom(r); }
+    if (!roomRef.current || r.version > roomRef.current.version) { roomRef.current = r; setRoom(r); }
   }, []);
 
   const refresh = useCallback(async () => {
@@ -40,8 +39,6 @@ export default function OnlineGame({ initial, invite, onExit }) {
     setBusy(true); setErr('');
     try { apply((await call(action, { code, invite, ...extra })).room); } catch (e) { setErr(e.message); throw e; } finally { setBusy(false); }
   };
-
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, []);
 
   useEffect(() => {
     let off = () => {};
@@ -84,7 +81,6 @@ export default function OnlineGame({ initial, invite, onExit }) {
     onExit();
   };
 
-  const srvNow = now + offset.current;
   const myKey = room.mySeat >= 0 ? room.seats[room.mySeat]?.key : null;
 
   // Tin chưa đọc
@@ -201,7 +197,7 @@ export default function OnlineGame({ initial, invite, onExit }) {
         game={viewGame}
         me={room.myEngine}
         layout={(i) => ({ k: (room.map[i] - ref + 6) % 6, n: 6 })}
-        now={srvNow}
+        offset={offset.current}
         busy={busy}
         away={amAway}
         onAct={(a) => doCall('act', a)}

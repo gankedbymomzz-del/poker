@@ -10,7 +10,7 @@ const ROWS = [
   { key: 'bot', label: 'Chi cuối', n: 5 },
 ];
 
-export default function MauBinhTable({ game: g, me, layout, now, onAct, headerExtra, away, busy }) {
+export default function MauBinhTable({ game: g, me, layout, offset = 0, onAct, headerExtra, away, busy }) {
   const L = me >= 0 && !away ? MB.legal(g, me) : null;
   const meSeat = me >= 0 ? g.seats[me] : null;
   const handKey = meSeat?.hand?.join() || '';
@@ -94,7 +94,7 @@ export default function MauBinhTable({ game: g, me, layout, now, onAct, headerEx
               <button className="btn ghost" onClick={() => { setArr(suggested); setPick(null); }}>Xếp tự động</button>
               <button className="btn gold" disabled={busy} onClick={() => act({ type: 'arrange', ...arr })}>Xong</button>
             </div>
-            <Timer deadline={g.deadline} now={now} total={90000} />
+            <Timer deadline={g.deadline} offset={offset} total={90000} />
           </div>
         )}
         {!L && arranging && meSeat && <p className="waiting">Đã báo xong, chờ người khác xếp…</p>}

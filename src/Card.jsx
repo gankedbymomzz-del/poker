@@ -24,7 +24,6 @@ export default function Card({ c, size = 'md', dim, glow, flipIn, faceDown, dela
             <>
               <span className="corner tl"><b>{r}</b><i>{s}</i></span>
               <span className="pip">{s}</span>
-              <span className="corner br"><b>{r}</b><i>{s}</i></span>
             </>
           )}
         </span>

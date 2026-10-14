@@ -17,11 +17,8 @@ export default function PracticeGame({ type, name, bots, fast, onExit }) {
     const options = type === 'poker' ? { levelMs: fast ? 60000 : 6 * 60000, actionMs: 30000 } : { rounds: 6 };
     return G.startRound(G.create({ players, now: t, options }), t);
   });
-  const [now, setNow] = useState(Date.now());
   const gRef = useRef(g);
   gRef.current = g;
-
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, []);
 
   useEffect(() => {
     const x = gRef.current;
@@ -54,7 +51,7 @@ export default function PracticeGame({ type, name, bots, fast, onExit }) {
         game={G.view(g, ME)}
         me={ME}
         layout={(i) => ({ k: (i - ME + n) % n, n })}
-        now={now}
+        offset={0}
         onAct={(a) => { setG(G.act(gRef.current, ME, a, Date.now())); }} // sai luật thì báo lỗi cho người chơi
         headerExtra={<button className="pill btn-pill" onClick={onExit}>Thoát</button>}
       />

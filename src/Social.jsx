@@ -78,7 +78,7 @@ export default function Social({ room, meKey, call, panel, setPanel, throwTo, se
       {/* Icon đang bay */}
       {fx.map((f) => (
         <span key={f.id} className="throw-fx" aria-hidden="true"
-          style={{ '--x0': `${f.a.x}px`, '--y0': `${f.a.y}px`, '--x1': `${f.b.x}px`, '--y1': `${f.b.y}px` }}>
+          style={{ left: f.a.x, top: f.a.y, '--dx': `${f.b.x - f.a.x}px`, '--dy': `${f.b.y - f.a.y}px` }}>
           <span>{f.e}</span>
         </span>
       ))}

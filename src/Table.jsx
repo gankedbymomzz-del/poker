@@ -3,6 +3,7 @@ import { legalActions, potTotal } from '../engine/game.js';
 import { evaluate } from '../engine/evaluate.js';
 import Card from './Card.jsx';
 import { sfx, soundOn, setSound } from './lib/sfx.js';
+import { TimerBar, TurnRing, Countdown } from './lib/timers.jsx';
 
 export const fmt = (n) => Number(n || 0).toLocaleString('vi-VN');
 export const mmss = (ms) => {
@@ -11,9 +12,12 @@ export const mmss = (ms) => {
 };
 
 // Toạ độ ghế quanh bàn bầu dục (phần trăm). k = 0 là dưới cùng, đi theo chiều kim đồng hồ
+// Bàn chưa đủ 6 người: xếp đối thủ dọc nửa trên của bàn, chừa trống dải giữa cho bài chung
+const ARCS = { 1: [270], 2: [210, 330], 3: [195, 270, 345], 4: [195, 245, 295, 345] };
 export function seatXY(k, n) {
-  const a = Math.PI / 2 + (k * 2 * Math.PI) / n;
-  return { x: 50 + 42 * Math.cos(a), y: 48 + 40 * Math.sin(a) };
+  const deg = k === 0 ? 90 : (ARCS[n - 1]?.[k - 1] ?? 90 + (k * 360) / n);
+  const a = (deg * Math.PI) / 180;
+  return { x: 50 + 44 * Math.cos(a), y: 48 + 40 * Math.sin(a) };
 }
 export function seatPos(k, n) {
   const { x, y } = seatXY(k, n);
@@ -32,7 +36,7 @@ const hueOf = (name) => [...name].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 
  * me: chỉ số ghế của bạn, -1 nếu chỉ xem
  * layout: (i) => { k, n } vị trí hiển thị ghế i
  */
-export default function Table({ game, me, layout, now, onAct, headerExtra, away, footerNote, busy }) {
+export default function Table({ game, me, layout, offset = 0, onAct, headerExtra, away, footerNote, busy }) {
   const [raiseTo, setRaiseTo] = useState(0);
   const [raiseOpen, setRaiseOpen] = useState(false);
   const [showLog, setShowLog] = useState(false);
@@ -116,14 +120,12 @@ export default function Table({ game, me, layout, now, onAct, headerExtra, away,
   if (!h) return null;
   const pot = potTotal(game);
   const [sb, bb] = game.config.levels[game.level];
-  const elapsed = now - game.startedAt;
-  const nextLevelIn = game.config.levelMs - (elapsed % game.config.levelMs);
-  const nextIdx = Math.min(game.config.levels.length - 1, Math.floor(elapsed / game.config.levelMs) + 1);
+  const nextIdx = Math.min(game.config.levels.length - 1, game.level + 1);
   const nextLevel = game.config.levels[nextIdx];
+  const nextLevelAt = game.startedAt + (game.level + 1) * game.config.levelMs;
   const winners = new Set(result ? result.pots.filter((p) => !p.returned).flatMap((p) => p.winners.map(Number)) : []);
   const bestCards = new Set();
   if (reveal) result.pots.forEach((p) => p.winners.forEach((w) => result.hands[w]?.best.forEach((c) => bestCards.add(c))));
-  const timeLeft = h.deadline ? Math.max(0, (h.deadline - now) / game.config.actionMs) : 0;
   const isDealing = !!dealing;
 
   const flipMine = (idx) => {
@@ -158,7 +160,9 @@ export default function Table({ game, me, layout, now, onAct, headerExtra, away,
         {headerExtra}
         <div className="pill">Ván <b>{game.handNo}</b></div>
         <div className="pill blinds">Blind <b>{fmt(sb)}/{fmt(bb)}</b></div>
-        <div className="pill">Lên {fmt(nextLevel[0])}/{fmt(nextLevel[1])} sau <b>{mmss(nextLevelIn)}</b></div>
+        <Countdown to={nextLevelAt} offset={offset}>
+          {(ms) => <div className="pill">Lên {fmt(nextLevel[0])}/{fmt(nextLevel[1])} sau <b>{mmss(ms)}</b></div>}
+        </Countdown>
         <button className="pill btn-pill" onClick={() => setShowLog(true)}>Diễn biến</button>
         <button className="pill btn-pill icon" onClick={() => setShowSet(true)} aria-label="Cài đặt">⚙</button>
       </header>
@@ -211,7 +215,8 @@ export default function Table({ game, me, layout, now, onAct, headerExtra, away,
                       : backs ? <><Card c={null} size="sm" /><Card c={null} size="sm" /></> : null}
                   </div>
                 )}
-                <div className="avatar" style={active ? { '--p': timeLeft } : undefined}>
+                <div className="avatar">
+                  {active && <TurnRing deadline={h.deadline} total={game.config.actionMs} offset={offset} />}
                   <span>{s.name[0]}</span>
                   {game.button === i && <em className="dealer">D</em>}
                 </div>
@@ -241,7 +246,7 @@ export default function Table({ game, me, layout, now, onAct, headerExtra, away,
                     key={`${dealing.hand}-${i}-${r}`}
                     className="flyer"
                     style={{
-                      '--fx': `${DECK.x}%`, '--fy': `${DECK.y}%`, '--tx': `${t.x}%`, '--ty': `${t.y}%`,
+                      '--fx': DECK.x, '--fy': DECK.y, '--tx': t.x, '--ty': t.y,
                       '--rot': `${r ? 8 : -8}deg`, animationDelay: `${(r * dealing.order.length + j) * DEAL_GAP}ms`,
                     }}
                   />
@@ -307,7 +312,7 @@ export default function Table({ game, me, layout, now, onAct, headerExtra, away,
                 )}
               </div>
             )}
-            <div className="timer"><i style={{ width: `${timeLeft * 100}%` }} /></div>
+            <TimerBar deadline={h.deadline} total={game.config.actionMs} offset={offset} />
           </div>
         )}
         {err && <p className="err">{err}</p>}

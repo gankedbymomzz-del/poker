@@ -6,7 +6,7 @@ import { sfx } from '../lib/sfx.js';
 import { GameHeader, useDeal, Deck, Delta, Timer, seatPos, seatXY, fmt, hueOf } from './shared.jsx';
 
 // Bàn có nhà cái: Bài cào 3 lá và Xì dách
-export default function DealerTable({ game: g, me, layout, now, onAct, headerExtra, away, busy }) {
+export default function DealerTable({ game: g, me, layout, offset = 0, onAct, headerExtra, away, busy }) {
   const isXD = g.type === 'xidach';
   const M = isXD ? XD : BC;
   const L = me >= 0 && !away ? M.legal(g, me) : null;
@@ -130,7 +130,7 @@ export default function DealerTable({ game: g, me, layout, now, onAct, headerExt
             </div>
           </div>
         )}
-        {(L || g.phase === 'bet' || g.phase === 'peek' || g.phase === 'play') && <Timer deadline={g.deadline} now={now} total={totalMs} />}
+        {(L || g.phase === 'bet' || g.phase === 'peek' || g.phase === 'play') && <Timer deadline={g.deadline} offset={offset} total={totalMs} />}
         {!L && g.phase === 'bet' && isDealer && <p className="waiting">Bạn làm cái, chờ con đặt cược…</p>}
         {!L && g.phase === 'bet' && !isDealer && meSeat?.bet > 0 && <p className="waiting">Đã cược {fmt(meSeat.bet)}, chờ mọi người…</p>}
         {!L && (g.phase === 'peek' || g.phase === 'play') && meSeat && !meSeat.out && <p className="waiting">Chờ người khác…</p>}

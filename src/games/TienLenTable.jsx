@@ -8,7 +8,7 @@ const TYPE_VI = { single: 'Lẻ', pair: 'Đôi', triple: 'Sám', quad: 'Tứ qu�
 const comboName = (c) => (!c ? '' : c.type === 'straight' ? `Sảnh ${c.len} lá` : c.type === 'pairseq' ? `${c.len} đôi thông` : TYPE_VI[c.type]);
 const PLACE = ['Nhất', 'Nhì', 'Ba', 'Bét'];
 
-export default function TienLenTable({ game: g, me, layout, now, onAct, headerExtra, away, busy }) {
+export default function TienLenTable({ game: g, me, layout, offset = 0, onAct, headerExtra, away, busy }) {
   const L = me >= 0 && !away ? TL.legal(g, me) : null;
   const meSeat = me >= 0 ? g.seats[me] : null;
   const hand = meSeat?.hand ? TL.sortHand(meSeat.hand) : [];
@@ -127,7 +127,7 @@ export default function TienLenTable({ game: g, me, layout, now, onAct, headerEx
               <button className="btn ghost" onClick={hint}>Gợi ý</button>
               <button className="btn gold" disabled={busy || !canPlay} onClick={() => act({ type: 'play', cards: sel })}>Đánh</button>
             </div>
-            <Timer deadline={g.deadline} now={now} total={25000} />
+            <Timer deadline={g.deadline} offset={offset} total={25000} />
           </div>
         )}
         {!L && g.phase === 'play' && meSeat && !meSeat.finishPos && <p className="waiting">Chờ {g.seats[g.toAct]?.name}…</p>}

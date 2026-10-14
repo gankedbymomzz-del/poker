@@ -64,7 +64,7 @@ export function useDeal(trigger, targets, perSeat, gap = 110) {
     <div className="fly-layer" aria-hidden="true">
       {Array.from({ length: dealing.perSeat }).flatMap((_, r) => dealing.targets.map((t, j) => (
         <span key={`${dealing.key}-${r}-${j}`} className="flyer"
-          style={{ '--fx': '50%', '--fy': '30%', '--tx': `${t.x + (r - 1) * 2}%`, '--ty': `${t.y}%`, '--rot': `${(r - 1) * 7}deg`, animationDelay: `${(r * dealing.targets.length + j) * dealing.gap}ms` }} />
+          style={{ '--fx': 50, '--fy': 30, '--tx': t.x + (r - 1) * 2, '--ty': t.y, '--rot': `${(r - 1) * 7}deg`, animationDelay: `${(r * dealing.targets.length + j) * dealing.gap}ms` }} />
       )))}
     </div>
   );
@@ -84,11 +84,7 @@ export function Delta({ v, unit = '' }) {
   return <span className={`delta ${v > 0 ? 'up' : 'down'}`}>{v > 0 ? '+' : ''}{fmt(v)}{unit}</span>;
 }
 
-export function Timer({ deadline, now, total }) {
-  if (!deadline) return null;
-  const p = Math.max(0, Math.min(1, (deadline - now) / total));
-  return <div className="timer"><i style={{ width: `${p * 100}%` }} /></div>;
-}
+export { TimerBar as Timer } from '../lib/timers.jsx';
 
 export function FinalBoardAny({ game, onAgain, againLabel = 'Chơi giải mới', note }) {
   const point = gameOf(game.type).meta.scoring === 'point';
