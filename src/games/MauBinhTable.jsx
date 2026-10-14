@@ -55,7 +55,7 @@ export default function MauBinhTable({ game: g, me, layout, now, onAct, headerEx
             if (i === me) return null;
             const { k, n } = layout(i);
             return (
-              <div key={s.id} className={`seat ${arranging && !s.ready ? 'active' : ''}`} style={{ ...seatPos(k, n), '--hue': hueOf(s.name) }}>
+              <div key={s.id} data-pid={s.id} className={`seat ${arranging && !s.ready ? 'active' : ''}`} style={{ ...seatPos(k, n), '--hue': hueOf(s.name) }}>
                 <div className="avatar"><span>{s.name[0]}</span></div>
                 <div className="info"><b>{s.name}</b><span>{s.score} điểm</span></div>
                 {arranging && <div className="status">{s.ready ? 'Đã xếp xong' : 'Đang xếp…'}</div>}
@@ -66,7 +66,7 @@ export default function MauBinhTable({ game: g, me, layout, now, onAct, headerEx
         </div>
       </div>
 
-      <footer className={`me-bar mb-bar ${L ? 'my-turn' : ''}`}>
+      <footer className={`me-bar mb-bar ${L ? 'my-turn' : ''}`} data-pid={meSeat?.id}>
         {meSeat && mine && (
           <div className="mb-rows">
             {sp && <p className="mb-special">Mậu binh tới trắng: <b>{sp.name}</b>! Ăn 6 chi mỗi người</p>}

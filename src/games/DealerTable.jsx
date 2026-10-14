@@ -58,7 +58,7 @@ export default function DealerTable({ game: g, me, layout, now, onAct, headerExt
             const { k, n } = layout(i);
             const active = g.toAct === i || (g.phase === 'bet' && i !== g.dealer && !s.bet && !s.out) || (g.phase === 'peek' && !s.ready && !s.out);
             return (
-              <div key={s.id} className={`seat ${active && !dealing ? 'active' : ''} ${s.out ? 'out' : ''} ${g.phase === 'done' && s.delta > 0 ? 'won' : ''}`}
+              <div key={s.id} data-pid={s.id} className={`seat ${active && !dealing ? 'active' : ''} ${s.out ? 'out' : ''} ${g.phase === 'done' && s.delta > 0 ? 'won' : ''}`}
                 style={{ ...seatPos(k, n), '--hue': hueOf(s.name) }}>
                 {!s.out && !dealing && (
                   <div className="seat-cards">
@@ -80,7 +80,7 @@ export default function DealerTable({ game: g, me, layout, now, onAct, headerExt
         </div>
       </div>
 
-      <footer className={`me-bar ${L ? 'my-turn' : ''}`}>
+      <footer className={`me-bar ${L ? 'my-turn' : ''}`} data-pid={meSeat?.id}>
         {meSeat && !meSeat.out && meSeat.hand && !dealing && (
           <div className="my-cards">
             <div className="hole">

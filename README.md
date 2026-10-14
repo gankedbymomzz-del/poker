@@ -6,6 +6,21 @@ Texas Hold'em No-Limit, thể thức Sit & Go cho 2–6 người. Chip ảo, ch�
 
 ---
 
+## Cập nhật: chat, ném icon, vay chip
+
+Không cần chạy SQL. Upload thư mục mới lên GitHub là xong.
+
+| Tính năng | Cách dùng |
+|---|---|
+| **Chat** | Nút 💬 trên thanh trên (có số tin chưa đọc). Biểu cảm, câu nói nhanh, tin nhắn hiện thành bong bóng cạnh ghế |
+| **Ném icon** | **Chạm vào ghế người khác** → chọn 🍅 🌹 🥚 💣 🍺 💋 👏 💩, icon bay ngang bàn |
+| **Vay chip** | Nút 💰 (Poker, Bài cào, Xì dách) → chọn người, số chip → người kia bấm Cho vay / Từ chối |
+| **Trả nợ** | 💰 → Sổ nợ → Trả hết |
+
+Luật vay: chip chỉ chuyển **khi hết ván** (không chuyển giữa ván để không phá luật cược). Người cho vay và người trả luôn giữ lại ít nhất 1 chip. Hết chip mà được vay thì **vào chơi lại**. Lời hỏi vay tự hết hạn sau 90 giây. Sổ nợ xoá khi mở giải mới.
+
+Chống phá: 0,7 giây/tin chat, 1,2 giây/lần ném icon, tự che từ thô tục.
+
 ## Cập nhật: 5 game bài
 
 Không cần chạy thêm SQL. Chỉ cần upload thư mục mới lên GitHub.

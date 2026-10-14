@@ -5,6 +5,7 @@ import { seatPos } from './Table.jsx';
 import GameView from './games/GameView.jsx';
 import { FinalBoardAny } from './games/shared.jsx';
 import { GAME_LIST, gameOf } from '../engine/games/index.js';
+import Social from './Social.jsx';
 
 const ROUND_OPTS = [4, 8, 12];
 
@@ -15,6 +16,9 @@ export default function OnlineGame({ initial, onExit }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [live, setLive] = useState('connecting');
+  const [panel, setPanel] = useState(null);       // 'chat' | 'loan'
+  const [throwTo, setThrowTo] = useState(null);
+  const lastRead = useRef(null);
   const roomRef = useRef(initial);
   const offset = useRef(initial.now - Date.now());
   const code = initial.code;
@@ -71,12 +75,39 @@ export default function OnlineGame({ initial, onExit }) {
   };
 
   const srvNow = now + offset.current;
+  const myKey = room.mySeat >= 0 ? room.seats[room.mySeat]?.key : null;
+
+  // Tin chưa đọc
+  const chat = room.chat || [];
+  if (lastRead.current === null) lastRead.current = chat.length ? chat[chat.length - 1].id : 0;
+  if (panel === 'chat' && chat.length) lastRead.current = chat[chat.length - 1].id;
+  const unread = chat.filter((m) => m.id > lastRead.current && m.k !== myKey && m.y !== 'sys').length;
+  const loanAlert = (room.loans || []).some((l) => l.from === myKey && l.status === 'pending' && Date.now() - l.t < 90000);
+  const chipGame = ['poker', 'baicao', 'xidach'].includes(room.type) && room.game;
+
+  // Chạm vào ghế người khác → ném icon
+  const onTap = (e) => {
+    const el = e.target.closest('[data-pid]');
+    if (!el || el.tagName === 'FOOTER' || e.target.closest('button')) return;
+    const pid = el.dataset.pid;
+    const seat = room.seats.find((s) => s?.key === pid);
+    if (!pid || pid === myKey || !seat || !myKey) return;
+    setThrowTo({ pid, name: seat.name });
+  };
+
   const header = (
     <>
       <button className="pill btn-pill" onClick={leave}>Rời bàn</button>
       <div className="pill">Bàn <b>{code}</b></div>
       <div className={`pill live ${live === 'SUBSCRIBED' ? 'on' : ''}`} title={live === 'SUBSCRIBED' ? 'Cập nhật tức thì' : 'Đang dùng chế độ dự phòng'}>●</div>
+      <button className="pill btn-pill badge-wrap" onClick={() => setPanel('chat')} aria-label="Trò chuyện">💬{unread > 0 && <i className="badge">{unread}</i>}</button>
+      {chipGame && (
+        <button className="pill btn-pill badge-wrap" onClick={() => setPanel('loan')} aria-label="Vay chip">💰{loanAlert && <i className="badge">!</i>}</button>
+      )}
     </>
+  );
+  const social = (
+    <Social room={room} meKey={myKey} call={(a, p) => doCall(a, p)} panel={panel} setPanel={setPanel} throwTo={throwTo} setThrowTo={setThrowTo} />
   );
 
   // ---------- Phòng chờ ----------
@@ -87,7 +118,8 @@ export default function OnlineGame({ initial, onExit }) {
     const tooMany = seated > meta.max;
     const tooFew = seated < meta.min;
     return (
-      <div className="room">
+      <div className="room" onClick={onTap}>
+        {social}
         <header className="top">{header}</header>
         <div className="table-wrap">
           <div className="felt">
@@ -97,7 +129,7 @@ export default function OnlineGame({ initial, onExit }) {
               <p className="lead small">{meta.name} · {meta.min}–{meta.max} người</p>
             </div>
             {room.seats.map((s, t) => (
-              <div key={t} className={`seat lobby ${t === room.mySeat ? 'mine' : ''}`} style={seatPos((t - ref + 6) % 6, 6)}>
+              <div key={t} data-pid={s?.key} className={`seat lobby ${t === room.mySeat ? 'mine' : ''}`} style={seatPos((t - ref + 6) % 6, 6)}>
                 {s ? (
                   <>
                     <div className="avatar"><span>{s.name[0]}</span></div>
@@ -149,7 +181,8 @@ export default function OnlineGame({ initial, onExit }) {
     ? { ...g, seats: g.seats.map((s, i) => ({ ...s, awayTag: !!room.seats[room.map[i]]?.away && !s.out })) }
     : g;
   return (
-    <>
+    <div className="social-root" onClick={onTap}>
+      {social}
       <GameView
         game={viewGame}
         me={room.myEngine}
@@ -172,6 +205,6 @@ export default function OnlineGame({ initial, onExit }) {
           note={room.isHost ? null : 'Chờ chủ bàn mở giải mới…'}
         />
       )}
-    </>
+    </div>
   );
 }

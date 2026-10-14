@@ -1,6 +1,7 @@
 // ====== API BÀN CHƠI NHIỀU NGƯỜI (Poker, Bài cào, Xì dách, Tiến lên, Mậu binh) ======
 // POST /api/poker { action, name, token, code?, seat?, ...hành động của game }
 // action: register | me | leaders | create | join | state | sit | setgame | start | act | leave | back | restart
+//         chat | throw | loan | loanreply | repay
 // GET  /api/poker?action=config → địa chỉ + khoá công khai Supabase cho điện thoại nghe tín hiệu
 //
 // Nguyên tắc: máy chủ nắm toàn bộ trạng thái (kể cả bộ bài), mỗi người chỉ nhận phần mình được xem.
@@ -32,12 +33,63 @@ async function auth(b) {
 const newState = (host) => ({ host, type: 'poker', rounds: null, seats: Array(SEATS).fill(null), game: null, map: [], doneAt: null, finishedAt: null, settings: SETTINGS });
 const statusOf = (st) => (!st.game ? 'lobby' : st.game.finished ? 'finished' : 'playing');
 
+// ====== CHAT & NÉM ICON ======
+const CHAT_KEEP = 60;
+export const EMOTES = ['😂', '😡', '😭', '👍', '🔥', '🙏', '😎', '🤡'];
+export const THROWS = ['🍅', '🌹', '🥚', '💣', '🍺', '💋', '👏', '💩'];
+const BAD = ['đm', 'đmm', 'dm', 'dmm', 'đcm', 'dcm', 'vcl', 'vkl', 'vl', 'clm', 'cmm', 'địt', 'lồn', 'cặc', 'buồi', 'đụ', 'đĩ', 'fuck', 'shit'];
+const BAD_RE = new RegExp(`(?<![\\p{L}\\p{N}])(${BAD.join('|')})(?![\\p{L}\\p{N}])`, 'giu');
+const cleanText = (t) => String(t || '').normalize('NFC').replace(/\s+/g, ' ').trim().slice(0, 120).replace(BAD_RE, '***');
+
+function pushChat(st, msg) {
+  st.chatSeq = (st.chatSeq || 0) + 1;
+  st.chat = [...(st.chat || []), { id: st.chatSeq, t: Date.now(), ...msg }].slice(-CHAT_KEEP);
+}
+const sys = (st, text) => pushChat(st, { y: 'sys', text });
+function rateLimit(st, key, now, ms = 700) {
+  st.lastChat ||= {};
+  if (now - (st.lastChat[key] || 0) < ms) throw httpErr(429, 'Gửi chậm lại một chút');
+  st.lastChat[key] = now;
+}
+
+// ====== VAY CHIP ======
+// Chip chỉ chuyển giữa 2 ván (chuyển giữa ván sẽ phá luật cược). Người cho/trả luôn giữ lại ít nhất 1 chip.
+const CHIP_GAMES = new Set(['poker', 'baicao', 'xidach']);
+const LOAN_TTL = 90000;
+const fmtChip = (n) => Number(n).toLocaleString('vi-VN');
+
+function applyTransfers(st) {
+  if (!st.transfers?.length || !st.game) return false;
+  const seats = st.game.seats;
+  for (const tr of st.transfers) {
+    const from = seats.find((s) => s.id === tr.from);
+    const to = seats.find((s) => s.id === tr.to);
+    const loan = (st.loans || []).find((l) => l.id === tr.loanId);
+    if (!from || !to || !loan) continue;
+    let amt = Math.min(tr.amount, from.stack - 1);
+    if (tr.kind === 'repay') amt = Math.min(amt, loan.amount - loan.repaid);
+    if (amt <= 0) {
+      if (tr.kind === 'loan') loan.status = 'failed';
+      sys(st, `${from.name} không đủ chip để ${tr.kind === 'loan' ? 'cho vay' : 'trả nợ'}`);
+      continue;
+    }
+    from.stack -= amt;
+    to.stack += amt;
+    if (to.out && to.stack > 0) { to.out = false; to.place = null; } // hết chip mà được vay thì vào chơi lại
+    if (tr.kind === 'loan') { loan.status = 'active'; loan.amount = amt; sys(st, `${to.name} đã nhận ${fmtChip(amt)} chip vay từ ${from.name}`); }
+    else { loan.repaid += amt; if (loan.repaid >= loan.amount) loan.status = 'repaid'; sys(st, `${from.name} đã trả ${to.name} ${fmtChip(amt)} chip`); }
+  }
+  st.transfers = [];
+  return true;
+}
+
 // Tự chạy tiếp bàn: người hết giờ, người đã rời bàn, chia ván mới — dùng chung cho mọi game
 function progress(st, now) {
   const G = gameOf(st.type);
   let changed = false;
   for (let guard = 0; st.game && !st.game.finished && guard < 80; guard += 1) {
     if (G.roundDone(st.game)) {
+      if (st.transfers?.length && applyTransfers(st)) changed = true;
       if (!st.doneAt) { st.doneAt = now; changed = true; break; }
       if (now - st.doneAt < nextMs(st.type)) break;
       st.game = G.startRound(st.game, now, serverRng());
@@ -104,6 +156,9 @@ function view(row, meKey, now) {
     map: st.map, mySeat, myEngine,
     doneAt: st.doneAt, nextHandMs: nextMs(st.type), settings: st.settings,
     game: st.game ? gameOf(st.type).view(st.game, myEngine) : null,
+    chat: (st.chat || []).slice(-40),
+    loans: st.loans || [],
+    pendingTransfers: (st.transfers || []).length,
   };
 }
 
@@ -260,12 +315,84 @@ export default async function handler(req, res) {
         });
         break;
 
+      case 'chat':
+        row = await mutate(code, (st) => {
+          const text = cleanText(b.text);
+          if (!text) throw httpErr(400, 'Tin nhắn trống');
+          rateLimit(st, me.key, now);
+          pushChat(st, { y: EMOTES.includes(text) ? 'emote' : 'msg', k: me.key, n: me.name, text });
+          return true;
+        });
+        break;
+
+      case 'throw':
+        row = await mutate(code, (st) => {
+          if (!THROWS.includes(b.e)) throw httpErr(400, 'Icon không hợp lệ');
+          const to = st.seats.find((s) => s?.key === b.to);
+          if (!to || b.to === me.key) throw httpErr(400, 'Hãy chọn người khác');
+          rateLimit(st, `${me.key}:nem`, now, 1200);
+          pushChat(st, { y: 'throw', k: me.key, n: me.name, to: to.key, toName: to.name, e: b.e });
+          return true;
+        });
+        break;
+
+      case 'loan':
+        row = await mutate(code, (st) => {
+          if (!CHIP_GAMES.has(st.type) || !st.game || st.game.finished) throw httpErr(409, 'Chỉ vay được khi đang chơi game tính chip');
+          const lender = st.game.seats.find((s) => s.id === b.to);
+          const amount = Math.floor(Number(b.amount));
+          if (!lender || b.to === me.key) throw httpErr(400, 'Hãy chọn người cho vay');
+          if (!(amount >= 50 && amount <= 100000)) throw httpErr(400, 'Số chip vay từ 50 đến 100.000');
+          if (amount > lender.stack - 1) throw httpErr(409, `${lender.name} chỉ còn ${fmtChip(lender.stack)} chip`);
+          st.loans ||= [];
+          if (st.loans.filter((l) => l.to === me.key && l.status === 'pending').length >= 2) throw httpErr(409, 'Bạn đang có 2 lời hỏi vay chờ trả lời');
+          st.loanSeq = (st.loanSeq || 0) + 1;
+          st.loans.push({ id: st.loanSeq, from: lender.id, fromName: lender.name, to: me.key, toName: me.name, amount, repaid: 0, status: 'pending', t: now });
+          sys(st, `${me.name} hỏi vay ${lender.name} ${fmtChip(amount)} chip`);
+          return true;
+        });
+        break;
+
+      case 'loanreply':
+        row = await mutate(code, (st) => {
+          const loan = (st.loans || []).find((l) => l.id === Number(b.id));
+          if (!loan || loan.from !== me.key) throw httpErr(404, 'Không tìm thấy lời hỏi vay');
+          if (loan.status !== 'pending') throw httpErr(409, 'Lời hỏi vay này đã xử lý');
+          if (now - loan.t > LOAN_TTL) { loan.status = 'expired'; sys(st, `Lời hỏi vay của ${loan.toName} đã hết hạn`); return true; }
+          if (b.accept) {
+            loan.status = 'accepted';
+            (st.transfers ||= []).push({ kind: 'loan', from: loan.from, to: loan.to, amount: loan.amount, loanId: loan.id });
+            sys(st, `${me.name} đồng ý cho ${loan.toName} vay ${fmtChip(loan.amount)} chip (chuyển khi hết ván)`);
+          } else {
+            loan.status = 'declined';
+            sys(st, `${me.name} từ chối cho ${loan.toName} vay`);
+          }
+          progress(st, now); // đang nghỉ giữa 2 ván thì chuyển luôn
+          return true;
+        });
+        break;
+
+      case 'repay':
+        row = await mutate(code, (st) => {
+          const loan = (st.loans || []).find((l) => l.id === Number(b.id));
+          if (!loan || loan.to !== me.key || loan.status !== 'active') throw httpErr(404, 'Không có khoản nợ này');
+          const remain = loan.amount - loan.repaid;
+          const amount = Math.min(remain, Math.floor(Number(b.amount) || remain));
+          if (!(amount > 0)) throw httpErr(400, 'Số chip trả không hợp lệ');
+          (st.transfers ||= []).push({ kind: 'repay', from: me.key, to: loan.from, amount, loanId: loan.id });
+          sys(st, `${me.name} sẽ trả ${loan.fromName} ${fmtChip(amount)} chip khi hết ván`);
+          progress(st, now);
+          return true;
+        });
+        break;
+
       case 'restart':
         row = await mutate(code, (st) => {
           if (st.host !== me.key) throw httpErr(403, 'Chỉ chủ bàn mới mở giải mới được');
           if (st.game && !st.game.finished) throw httpErr(409, 'Giải đang diễn ra');
           st.seats = st.seats.map((s) => (s && !s.away ? s : null));
           st.game = null; st.map = []; st.doneAt = null; st.finishedAt = null;
+          st.loans = []; st.transfers = [];
           return true;
         });
         break;

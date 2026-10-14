@@ -460,3 +460,95 @@ input { user-select: text; -webkit-user-select: text; }
 .vs { margin: 2px 0 0; font-size: 13px; color: var(--ivory); }
 .vs em { color: var(--muted); }
 @media (min-width: 760px) { .small-felt .felt { max-height: 360px; } }
+
+/* =========================================================
+   NÚT HÀNH ĐỘNG (gọn, 2 dòng, giới hạn bề rộng trên màn hình lớn)
+   ========================================================= */
+.me-bar > * { width: 100%; max-width: 560px; margin-left: auto; margin-right: auto; }
+.me-bar > .my-cards, .me-bar > .hand-fan { max-width: 720px; }
+.actions { gap: 8px; }
+.btn-row { gap: 10px; }
+.btn-row .btn {
+  min-height: 54px; border-radius: 16px; padding: 8px 10px; font-size: 16px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; line-height: 1.15;
+}
+.btn-row .btn small { font-size: 12px; font-weight: 700; opacity: .75; }
+.act-fold { background: rgba(255, 255, 255, .03) !important; color: #ff9b93 !important; box-shadow: inset 0 0 0 1.5px rgba(255, 120, 110, .4) !important; }
+.act-fold:active:not(:disabled) { background: rgba(196, 48, 43, .18) !important; }
+.act-call { background: linear-gradient(180deg, #45c98b, #1f8a57) !important; color: #fff !important; box-shadow: 0 3px 0 #145c3a, 0 8px 18px rgba(31, 138, 87, .28) !important; }
+.act-call:active:not(:disabled) { box-shadow: 0 1px 0 #145c3a !important; }
+.turn-tag { font-size: 11px; padding: 2px 12px; }
+.timer { height: 3px; }
+.raise-panel { padding: 10px 12px; border-radius: 16px; background: rgba(255, 255, 255, .04); border: 1px solid rgba(224, 189, 99, .25); }
+
+/* =========================================================
+   GIAO LƯU: CHAT, NÉM ICON, VAY CHIP
+   ========================================================= */
+.social-root { height: 100%; }
+.badge-wrap { position: relative; }
+.badge {
+  position: absolute; right: -5px; top: -6px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px;
+  background: #e5483f; color: #fff; font-size: 10px; font-weight: 800; font-style: normal; display: grid; place-items: center;
+}
+.seat[data-pid] { cursor: pointer; }
+
+.throw-fx { position: fixed; left: var(--x0); top: var(--y0); z-index: 50; pointer-events: none; animation: throwMove .85s cubic-bezier(.3, .4, .5, 1) forwards; }
+.throw-fx span { display: block; font-size: 36px; transform: translate(-50%, -50%); animation: throwSpin .85s linear forwards, splat .55s .85s ease-out forwards; filter: drop-shadow(0 6px 8px rgba(0, 0, 0, .5)); }
+@keyframes throwMove { to { left: var(--x1); top: var(--y1); } }
+@keyframes throwSpin {
+  0% { transform: translate(-50%, -50%) scale(.6) rotate(0); }
+  50% { transform: translate(-50%, -160%) scale(1.3) rotate(220deg); }
+  100% { transform: translate(-50%, -50%) scale(1.1) rotate(400deg); }
+}
+@keyframes splat { 0% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; } 35% { transform: translate(-50%, -50%) scale(2); } 100% { transform: translate(-50%, -50%) scale(2.3); opacity: 0; } }
+
+.chat-bubble {
+  position: fixed; z-index: 45; pointer-events: none; transform: translate(-50%, calc(-100% - 34px));
+  max-width: 170px; padding: 6px 10px; border-radius: 14px 14px 14px 4px; background: #f7f1e3; color: #1d1a16;
+  font-size: 13px; font-weight: 700; box-shadow: 0 6px 16px rgba(0, 0, 0, .45); animation: bubble 3.8s ease forwards;
+  overflow-wrap: anywhere;
+}
+.chat-bubble.emote { background: none; box-shadow: none; font-size: 40px; padding: 0; }
+@keyframes bubble { 0% { opacity: 0; transform: translate(-50%, calc(-100% - 20px)) scale(.8); } 8% { opacity: 1; transform: translate(-50%, calc(-100% - 34px)); } 85% { opacity: 1; } 100% { opacity: 0; } }
+
+.loan-banner {
+  position: fixed; left: 50%; top: calc(64px + var(--safe-t)); transform: translateX(-50%); z-index: 40;
+  width: min(420px, calc(100% - 20px)); display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 12px; border-radius: 16px; background: rgba(20, 38, 29, .97); border: 1px solid var(--gold);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .55); animation: up .3s ease-out; font-size: 14px;
+}
+.loan-banner b { color: var(--gold); }
+.loan-banner > div { display: flex; gap: 6px; flex-shrink: 0; }
+
+.throw-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.throw-grid button { font-size: 34px; padding: 10px 0; border-radius: 14px; border: 1px solid rgba(255, 255, 255, .1); background: rgba(255, 255, 255, .05); }
+.throw-grid button:active { transform: scale(.92); background: rgba(224, 189, 99, .2); }
+
+.chat-sheet .chat-list { height: 40vh; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 12px; background: rgba(0, 0, 0, .3); user-select: text; }
+.chat-msg { max-width: 82%; padding: 6px 10px; border-radius: 14px 14px 14px 4px; background: rgba(255, 255, 255, .08); font-size: 14px; }
+.chat-msg b { display: block; font-size: 11px; color: var(--gold); }
+.chat-msg.me { align-self: flex-end; background: rgba(224, 189, 99, .2); border-radius: 14px 14px 4px 14px; }
+.chat-msg.sys, .chat-msg.throw { align-self: center; max-width: 95%; background: none; color: var(--muted); font-size: 12px; font-style: italic; text-align: center; }
+.chat-msg .emo { font-size: 28px; }
+.chip-row { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.chip-row::-webkit-scrollbar { display: none; }
+.chip-row button { flex: 0 0 auto; padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .12); background: rgba(255, 255, 255, .05); font-size: 13px; font-weight: 700; }
+.chip-row .emo-btn { font-size: 20px; padding: 3px 9px; }
+.chat-input { display: flex; gap: 8px; }
+.chat-input input { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 12px; border: 1.5px solid rgba(224, 189, 99, .3); background: rgba(0, 0, 0, .35); color: var(--text); font: inherit; font-size: 15px; }
+.note.left { text-align: left; }
+
+.loan-sheet h4 { margin: 6px 0 0; font-size: 14px; color: var(--ivory); }
+.lender-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px; }
+.lender-list button { display: flex; flex-direction: column; align-items: flex-start; padding: 8px 10px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, .12); background: rgba(255, 255, 255, .04); }
+.lender-list button.on { border-color: var(--gold); background: rgba(224, 189, 99, .14); }
+.lender-list button:disabled { opacity: .4; }
+.lender-list small { color: var(--gold); font-weight: 700; }
+.seg .amt { flex: 1.3; min-width: 0; padding: 8px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, .12); background: rgba(0, 0, 0, .3); color: var(--text); font: inherit; font-weight: 700; text-align: center; }
+.loan-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, .04); font-size: 14px; }
+.loan-item b { color: var(--gold); }
+.loan-item small { color: var(--muted); }
+.loan-item.incoming { border: 1px solid var(--gold); }
+.loan-item > div { display: flex; gap: 6px; flex-shrink: 0; }
+.loan-item.debt { border-left: 3px solid #ff7a70; }
+.loan-item.credit { border-left: 3px solid #52e08a; }

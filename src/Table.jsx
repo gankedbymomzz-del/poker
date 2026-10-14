@@ -201,6 +201,7 @@ export default function Table({ game, me, layout, now, onAct, headerExtra, away,
             return (
               <div
                 key={s.id}
+                data-pid={s.id}
                 className={`seat ${active ? 'active' : ''} ${s.folded ? 'folded' : ''} ${s.out ? 'out' : ''} ${winners.has(i) ? 'won' : ''} ${i === me ? 'me' : ''}`}
                 style={{ ...seatPos(k, nn), '--hue': hueOf(s.name) }}
               >
@@ -251,7 +252,7 @@ export default function Table({ game, me, layout, now, onAct, headerExtra, away,
         </div>
       </div>
 
-      <footer className={`me-bar ${myTurn ? 'my-turn' : ''}`}>
+      <footer className={`me-bar ${myTurn ? 'my-turn' : ''}`} data-pid={meSeat?.id}>
         {meSeat && !meSeat.out && meSeat.hole && !isDealing && (
           <div className="my-cards">
             <div className="hole">
@@ -293,11 +294,17 @@ export default function Table({ game, me, layout, now, onAct, headerExtra, away,
               </div>
             ) : (
               <div className="btn-row">
-                <button className="btn danger" disabled={busy} onClick={() => doAct({ type: 'fold' })}>Bỏ bài</button>
+                <button className="btn act-fold" disabled={busy} onClick={() => doAct({ type: 'fold' })}>Bỏ bài</button>
                 {L.check
-                  ? <button className="btn" disabled={busy} onClick={() => doAct({ type: 'check' })}>Nhường</button>
-                  : <button className="btn" disabled={busy} onClick={() => doAct({ type: 'call' })}>Theo <b>{fmt(L.call)}</b></button>}
-                {L.raise && <button className="btn gold" disabled={busy} onClick={() => setRaiseOpen(true)}>{L.raise.isBet ? 'Cược' : 'Tố'}</button>}
+                  ? <button className="btn act-call" disabled={busy} onClick={() => doAct({ type: 'check' })}>Nhường<small>không cược thêm</small></button>
+                  : <button className="btn act-call" disabled={busy} onClick={() => doAct({ type: 'call' })}>
+                      {L.call >= meSeat.stack ? 'All-in' : 'Theo'}<small>{fmt(L.call)} chip</small>
+                    </button>}
+                {L.raise && (
+                  <button className="btn gold" disabled={busy} onClick={() => setRaiseOpen(true)}>
+                    {L.raise.isBet ? 'Cược' : 'Tố'}<small>từ {fmt(L.raise.min)}</small>
+                  </button>
+                )}
               </div>
             )}
             <div className="timer"><i style={{ width: `${timeLeft * 100}%` }} /></div>

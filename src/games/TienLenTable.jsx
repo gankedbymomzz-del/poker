@@ -81,7 +81,7 @@ export default function TienLenTable({ game: g, me, layout, now, onAct, headerEx
             if (i === me) return null;
             const { k, n } = layout(i);
             return (
-              <div key={s.id} className={`seat ${g.toAct === i && !dealing ? 'active' : ''} ${s.passed ? 'folded' : ''}`}
+              <div key={s.id} data-pid={s.id} className={`seat ${g.toAct === i && !dealing ? 'active' : ''} ${s.passed ? 'folded' : ''}`}
                 style={{ ...seatPos(k, n), '--hue': hueOf(s.name) }}>
                 {!dealing && (
                   <div className="seat-cards stack">
@@ -102,7 +102,7 @@ export default function TienLenTable({ game: g, me, layout, now, onAct, headerEx
         </div>
       </div>
 
-      <footer className={`me-bar ${L ? 'my-turn' : ''}`}>
+      <footer className={`me-bar ${L ? 'my-turn' : ''}`} data-pid={meSeat?.id}>
         {meSeat && !dealing && (
           <>
             <div className="tl-top">

@@ -46,5 +46,8 @@ export const sfx = {
   check: () => [0, 0.09].forEach((d) => noise(0.04, 900, 0.35, d, 2)),   // gõ bàn
   fold: () => noise(0.18, 1200, 0.15, 0, 0.6),
   turn: () => { tone(880, 0.15, 0.08); tone(1320, 0.25, 0.06, 0.12); },
+  toss: () => noise(0.35, 1800, 0.12, 0, 1.5),                           // icon bay
+  splat: () => { noise(0.18, 500, 0.35, 0, 0.7); tone(140, 0.15, 0.08, 0, 'square'); }, // trúng đích
+  msg: () => tone(1250, 0.07, 0.05, 0, 'triangle'),
   win: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.25, 0.08, i * 0.1, 'triangle')),
 };
