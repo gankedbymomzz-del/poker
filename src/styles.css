@@ -183,3 +183,40 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
   .seat { width: 110px; }
 }
 @media (prefers-reduced-motion: reduce) { .card.face, .result { animation: none; } }
+
+/* ================== MÀN HÌNH CHÍNH & PHÒNG ================== */
+.setup { justify-content: flex-start; padding-top: calc(36px + var(--safe-t)); }
+.hello { margin: 0; color: var(--muted); }
+.hello b { color: var(--gold); }
+.menu-card {
+  width: min(360px, 100%); display: flex; flex-direction: column; gap: 10px; align-items: stretch;
+  padding: 16px; border-radius: 18px; background: rgba(0, 0, 0, .3); border: 1px solid rgba(217, 180, 90, .2);
+}
+.menu-card h2 { margin: 0; font-size: 18px; color: var(--ivory); text-align: left; }
+.menu-card .field { width: 100%; }
+.or { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+.or::before, .or::after { content: ''; flex: 1; height: 1px; background: rgba(255, 255, 255, .12); }
+.join { display: flex; gap: 8px; }
+.join input {
+  flex: 1; min-width: 0; padding: 11px; border-radius: 12px; border: 1.5px solid rgba(217, 180, 90, .35);
+  background: rgba(0, 0, 0, .35); color: var(--text); font: inherit; font-size: 20px; font-weight: 800;
+  text-align: center; letter-spacing: 4px; user-select: text;
+}
+.join input::placeholder { letter-spacing: 0; font-size: 15px; font-weight: 500; }
+.btn:disabled { opacity: .5; }
+
+.lobby-center { gap: 4px; }
+.code {
+  border: 0; background: none; color: var(--gold); font: inherit; font-size: 56px; font-weight: 800; letter-spacing: 8px;
+  line-height: 1; padding-left: 8px; text-shadow: 0 3px 0 rgba(0, 0, 0, .4);
+}
+.lead.small { font-size: 13px; margin: 0; }
+.seat.lobby.mine .info { border-color: var(--gold); }
+.empty-seat {
+  width: 64px; height: 64px; border-radius: 50%; border: 2px dashed rgba(255, 255, 255, .3);
+  background: rgba(0, 0, 0, .25); color: var(--muted); font-size: 12px; font-weight: 700;
+}
+.pill.live { color: #6b7d72; }
+.pill.live.on { color: #52e08a; }
+.status.away { color: #ffb547; }
+.me-bar .btn.big { width: 100%; }

@@ -2,58 +2,67 @@
 
 Texas Hold'em No-Limit, thể thức Sit & Go cho 2–6 người. Chip ảo, chỉ để giải trí.
 
-**Trạng thái: Bước 1/3 — Lõi luật chơi + bàn thử với máy.**
+**Trạng thái: Bước 2/3 — Bàn nhiều người chơi thật.**
 
 ---
 
-## Bước 1 (hiện tại): làm gì ngay
+## Bước 2 (hiện tại): làm gì ngay
 
-### 1. Đưa lên GitHub (repo MỚI, tách riêng với Săn Ma)
+### Điều kiện đã có (đã làm ở bước trước)
 
-1. https://github.com/new → tên repo `poker-nha-so-7` → **Create repository**.
-2. Bấm **uploading an existing file** → mở thư mục `poker`, **Ctrl + A** kéo thả toàn bộ bên trong → **Commit changes**.
-3. Kiểm tra: repo thấy ngay `package.json`, `engine/`, `src/` ở cấp ngoài cùng.
+- Supabase đã chạy đoạn SQL tạo 3 bảng `poker_users`, `poker_rooms`, `poker_signals`.
+- Vercel đã có 3 biến môi trường: `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_PUBLISHABLE_KEY` (tick Production + Preview).
 
-### 2. Deploy lên Vercel
+### 1. Cập nhật lên GitHub
 
-Vercel → **Add New → Project** → chọn `poker-nha-so-7` → **Deploy**. Vercel tự nhận Vite, không cần chỉnh gì.
+Repo `poker-nha-so-7` → **Add file → Upload files** → kéo thả toàn bộ nội dung thư mục `poker` mới → **Commit changes**.
+Thư mục mới `api/` phải nằm ngang hàng với `src/` và `engine/`.
 
-### 3. Chơi thử và soát luật
+Vercel tự deploy lại. Máy chủ được đặt ở **Tokyo** (`vercel.json`) cho cùng vùng với Supabase.
 
-Mở link trên điện thoại, chọn số bot, chọn blind "1 phút (thử nhanh)". Thử các tình huống sau:
+### 2. Kiểm tra máy chủ đã nhận cấu hình
 
-| Tình huống | Kết quả đúng |
+Mở `https://<link-của-bạn>/api/poker?action=config`
+
+| Thấy | Ý nghĩa |
 |---|---|
-| Mọi người chỉ theo preflop | Big Blind vẫn được Nhường hoặc Tố |
-| Có người tố lên 60 (blind 10/20) | Người sau muốn tố lại phải lên ít nhất 100 |
-| Bạn all-in, nhiều người theo với số chip khác nhau | Có hũ chính và hũ phụ, ai ăn hũ nào hiện rõ |
-| Hai người cùng bộ bài | Chia đôi hũ |
-| Chỉ còn 2 người | Dealer đặt Small Blind và nói trước ở preflop |
-| Để hết 30 giây không bấm | Tự Nhường nếu được, không thì tự Bỏ bài |
-| Bấm **Diễn biến** | Thấy từng hành động của ván |
+| `{"url":"https://anazdqhjnbujaczoqwxy.supabase.co","publishableKey":"sb_publishable_…"}` | ✅ Đúng |
+| `url` hoặc `publishableKey` rỗng | Thiếu biến trên Vercel, hoặc chưa Redeploy sau khi thêm biến |
 
-Thấy gì lạ thì chụp màn hình phần **Diễn biến** gửi mình.
+### 3. Chơi thử với 2–3 người
 
-### 4. (Tuỳ chọn) Chạy kiểm thử trên máy
+1. Người thứ nhất: ghi danh → **Tạo bàn mới** → nhận mã 4 số.
+2. Người khác: ghi danh → nhập mã → **Vào bàn**. Chạm ghế trống để đổi chỗ.
+3. Chủ bàn bấm **Bắt đầu giải**.
 
-Cài Node.js LTS (https://nodejs.org). Mở thư mục bằng VS Code → Terminal:
+Chấm tròn cạnh mã bàn: **xanh lá** = cập nhật tức thì qua Supabase Realtime. **Xám** = đang dùng chế độ dự phòng (hỏi máy chủ 2 giây/lần), vẫn chơi được nhưng chậm hơn.
 
-```bash
-npm install
-npm test
+### Khi gặp lỗi
+
+| Hiện tượng | Cách xử lý |
+|---|---|
+| "Máy chủ chưa cấu hình Supabase" | Thiếu `SUPABASE_URL` hoặc `SUPABASE_SECRET_KEY` trên Vercel → thêm rồi Redeploy |
+| "Invalid API key" / lỗi 401 khi ghi danh | Dán nhầm khoá: `SUPABASE_SECRET_KEY` phải là khoá `sb_secret_…` |
+| Lỗi "relation poker_users does not exist" | Chưa chạy đoạn SQL tạo bảng |
+| Chấm tròn luôn xám | Kiểm tra `SUPABASE_PUBLISHABLE_KEY`, và trong Supabase: Database → Publications → `supabase_realtime` có bảng `poker_signals` |
+
+---
+
+## Cách hệ thống hoạt động
+
+```
+Điện thoại  ──"tôi tố 200"──►  Vercel (Tokyo)  ──đọc/ghi──►  Supabase poker_rooms (bộ bài, bài tẩy: CHỈ máy chủ đọc được)
+     ▲                              │
+     │                              └──ghi số phiên bản──►  poker_signals ──Realtime──┐
+     └──────── "bàn vừa đổi" ◄────────────────────────────────────────────────────────┘
+     └── hỏi lại máy chủ → nhận ĐÚNG phần mình được xem (bài của mình + bài đã lật)
 ```
 
-Đúng thì thấy `# pass 23` và `# fail 0`. Bộ kiểm thử gồm chấm bài, hũ phụ, từng luật cược, và **giả lập hơn 3.000 ván** kiểm tra tổng chip luôn bảo toàn.
-
-### 5. Chuẩn bị cho Bước 2: tạo Supabase
-
-1. https://supabase.com → **Start your project** → đăng nhập bằng GitHub.
-2. **New project**: tên `poker-nha-so-7`, đặt mật khẩu database (lưu lại), Region **Southeast Asia (Singapore)**, gói **Free** → **Create**.
-3. Đợi 1–2 phút. Vào **Project Settings → API**, ghi lại 3 thứ: **Project URL**, **anon public key**, **service_role key**.
-
-⚠️ **service_role key** là chìa khoá toàn quyền: **không gửi vào chat, không đưa lên GitHub**. Bước 2 sẽ hướng dẫn dán vào Vercel.
-
----
+- Hai người bấm cùng lúc: máy chủ ghi có kiểm tra phiên bản, người sau tự thử lại, không mất hành động.
+- Hết giờ 20 giây: điện thoại tự "đánh thức" máy chủ đúng lúc, máy chủ tự Nhường hoặc Bỏ bài.
+- Tải lại trang giữa giải: tự vào lại đúng bàn, đúng ghế.
+- Rời bàn giữa giải: chuyển sang "Tạm vắng", máy tự bỏ bài thay. Bấm **Quay lại bàn** để chơi tiếp.
+- Bàn bỏ hoang quá 1 ngày tự được dọn.
 
 ## Luật chơi tóm tắt
 
@@ -74,7 +83,15 @@ poker/
 │   ├── game.js             # Máy cược No-Limit, lượt nói, loại người chơi, tăng blind
 │   ├── bots.js             # Người chơi máy
 │   └── tests/              # 23 kiểm thử + giả lập hàng nghìn ván
-└── src/                    # Bàn chơi thử với máy (React)
+├── api/
+│   ├── poker.js            # API bàn chơi: ghi danh, tạo/vào bàn, chọn ghế, hành động
+│   └── _lib/db.js          # Kết nối Supabase (chỉ chạy ở máy chủ)
+├── src/
+│   ├── App.jsx             # Màn hình chính
+│   ├── OnlineGame.jsx      # Chơi phòng: phòng chờ, bàn chơi, nghe tín hiệu
+│   ├── BotGame.jsx         # Luyện tập với máy
+│   └── Table.jsx           # Bàn chơi dùng chung cho cả 2 chế độ
+└── vercel.json             # Đặt máy chủ ở Tokyo
 ```
 
 ## Lộ trình
@@ -82,5 +99,5 @@ poker/
 | Bước | Nội dung | Trạng thái |
 |---|---|---|
 | 1 | Lõi luật + kiểm thử + bàn thử với máy | ✅ |
-| 2 | Phòng nhiều người: máy chủ Vercel + Supabase Realtime, chọn ghế, chơi thật | Tiếp theo |
-| 3 | Hoàn thiện: rớt mạng vào lại, bấm trước, lịch sử ván, chat, âm thanh | Sau đó |
+| 2 | Phòng nhiều người: máy chủ Vercel + Supabase Realtime, chọn ghế, chơi thật | ✅ |
+| 3 | Hoàn thiện: bấm trước, thời gian dự phòng, lịch sử ván, chat, âm thanh, hiệu ứng | Tiếp theo |
