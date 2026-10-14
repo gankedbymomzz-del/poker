@@ -68,7 +68,7 @@ export default function OnlineGame({ initial, onExit }) {
   const srvNow = now + offset.current;
   const header = (
     <>
-      <button className="pill btn-log" onClick={leave}>Rời bàn</button>
+      <button className="pill btn-pill" onClick={leave}>Rời bàn</button>
       <div className="pill">Bàn <b>{code}</b></div>
       <div className={`pill live ${live === 'SUBSCRIBED' ? 'on' : ''}`} title={live === 'SUBSCRIBED' ? 'Cập nhật tức thì' : 'Đang dùng chế độ dự phòng'}>●</div>
     </>

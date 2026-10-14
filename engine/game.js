@@ -286,6 +286,7 @@ function finishHand(g, now, showdown) {
   for (const i of busted) {
     g.seats[i].out = true;
     g.seats[i].place = remaining;
+    g.seats[i].hands = g.handNo;
     remaining -= 1;
     log(g, `${g.seats[i].name} bị loại, hạng ${g.seats[i].place}`);
   }
@@ -294,6 +295,7 @@ function finishHand(g, now, showdown) {
     g.finished = true;
     g.winner = left[0];
     g.seats[left[0]].place = 1;
+    g.seats[left[0]].hands = g.handNo;
     log(g, `${g.seats[left[0]].name} vô địch!`);
   }
 }

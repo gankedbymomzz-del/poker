@@ -2,7 +2,33 @@
 
 Texas Hold'em No-Limit, thể thức Sit & Go cho 2–6 người. Chip ảo, chỉ để giải trí.
 
-**Trạng thái: Bước 2/3 — Bàn nhiều người chơi thật.**
+**Trạng thái: Bước 3/3 (đợt 1) — Thành tích, giao diện mới, chia bài và lật bài.**
+
+---
+
+## Cập nhật mới nhất: làm gì ngay
+
+### 1. Chạy thêm 1 file SQL (bật lưu thành tích)
+
+Supabase → **SQL Editor** → **New query** → mở file `supabase/02_thanh_tich.sql` trong thư mục này, copy toàn bộ, dán vào → **Run**.
+
+Chưa chạy file này game vẫn chơi bình thường, chỉ là chưa lưu thành tích và Bảng vàng sẽ báo chưa bật.
+
+### 2. Cập nhật GitHub
+
+Upload toàn bộ thư mục `poker` mới như mọi lần. Vercel tự deploy.
+
+### Có gì mới
+
+| Phần | Chi tiết |
+|---|---|
+| **Thành tích** | Lưu số giải, số lần vô địch, top 3, hạng tốt nhất, tổng số ván. Hiện ở màn hình chính |
+| **Bảng vàng** | Top 20 người chơi theo số lần vô địch |
+| **Chia bài** | Bộ bài đặt giữa bàn, từng lá bay tới từng ghế theo đúng thứ tự từ trái nút Dealer |
+| **Lật bài** | Bài của bạn úp, viền nhấp nháy, **chạm từng lá để lật**. Bài chung và bài đối thủ lật 3D |
+| **Âm thanh** | Chia bài, lật bài, chip, gõ bàn khi nhường, báo tới lượt, nhạc thắng |
+| **Cài đặt** (nút ⚙) | Bật/tắt âm thanh, bật "Tự lật bài" nếu không thích chạm |
+| **Giao diện** | Bàn viền gỗ, nỉ có vân, lá bài có góc chỉ số, chip, nhãn "Tới lượt bạn", màn kết quả có cúp |
 
 ---
 

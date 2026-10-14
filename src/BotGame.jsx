@@ -47,7 +47,7 @@ export default function BotGame({ name, bots, fast, onExit }) {
         layout={(i) => ({ k: (i - ME + n) % n, n })}
         now={now}
         onAct={(a) => setGame((x) => act(x, ME, a, Date.now()))}
-        headerExtra={<button className="pill btn-log" onClick={onExit}>Thoát</button>}
+        headerExtra={<button className="pill btn-pill" onClick={onExit}>Thoát</button>}
       />
       {game.finished && <FinalBoard game={game} onAgain={onExit} againLabel="Về màn hình chính" />}
     </>

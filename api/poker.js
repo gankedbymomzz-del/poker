@@ -1,12 +1,12 @@
 // ====== API BÀN POKER NHIỀU NGƯỜI ======
 // POST /api/poker { action, name, token, code?, seat?, type?, to? }
-// action: register | create | join | state | sit | start | act | leave | back | restart
+// action: register | me | leaders | create | join | state | sit | start | act | leave | back | restart
 // GET  /api/poker?action=config → địa chỉ + khoá công khai Supabase cho điện thoại nghe tín hiệu
 //
 // Nguyên tắc: máy chủ nắm toàn bộ trạng thái (kể cả bộ bài), mỗi người chỉ nhận phần mình được xem.
 import crypto from 'node:crypto';
 import {
-  hasDb, publicConfig, getUser, insertUser, getRoom, insertRoom, saveRoom, cleanupRooms,
+  hasDb, publicConfig, getUser, insertUser, getRoom, insertRoom, saveRoom, cleanupRooms, rpc, getStats, topPlayers,
   NAME_RE, cleanName, keyOf, hash, serverRng,
 } from './_lib/db.js';
 import { createGame, startHand, act, publicView } from '../engine/game.js';
@@ -68,6 +68,18 @@ async function mutate(code, fn) {
   throw httpErr(409, 'Bàn đang bận, thử lại');
 }
 
+// Giải vừa kết thúc → ghi thành tích đúng 1 lần (ai "giành" được cờ statsDone thì người đó ghi)
+async function recordIfFinished(row) {
+  const st = row?.state;
+  if (!st?.game?.finished || st.statsDone) return;
+  let claimed = false;
+  await mutate(row.code, (s) => { if (s.statsDone || !s.game?.finished) return false; s.statsDone = true; claimed = true; return true; });
+  if (!claimed) return;
+  await Promise.all(st.game.seats.map((s) => rpc('poker_record_result', {
+    p_key: s.id, p_place: s.place || st.game.seats.length, p_hands: s.hands || st.game.handNo,
+  }).catch(() => {})));
+}
+
 function view(row, meKey, now) {
   const st = row.state;
   const mySeat = st.seats.findIndex((s) => s?.key === meKey);
@@ -111,6 +123,10 @@ export default async function handler(req, res) {
 
     const me = await auth(b);
     if (!me) return send(res, 401, { error: 'Phiên đăng nhập hết hạn, hãy ghi danh lại' });
+
+    // ---------- Thành tích & Bảng vàng ----------
+    if (b.action === 'me') return send(res, 200, { stats: await getStats(me.key) });
+    if (b.action === 'leaders') return send(res, 200, { top: await topPlayers() });
 
     // ---------- Tạo bàn ----------
     if (b.action === 'create') {
@@ -227,6 +243,7 @@ export default async function handler(req, res) {
       default:
         return send(res, 400, { error: 'Hành động không hợp lệ' });
     }
+    await recordIfFinished(row).catch(() => {});
     return send(res, 200, { room: view(row, me.key, now) });
   } catch (e) {
     if (e.rule) return send(res, 400, { error: e.message });

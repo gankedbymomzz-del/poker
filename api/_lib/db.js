@@ -35,6 +35,17 @@ async function rest(path, { method = 'GET', body, prefer } = {}) {
 export const getUser = async (key) => (await rest(`poker_users?name_key=eq.${encodeURIComponent(key)}&select=*`))[0] || null;
 export const insertUser = (row) => rest('poker_users', { method: 'POST', body: row, prefer: 'return=minimal' });
 
+export const rpc = (fn, args) => rest(`rpc/${fn}`, { method: 'POST', body: args });
+
+// Thành tích (cần chạy supabase/02_thanh_tich.sql; chưa chạy thì trả null, game vẫn chơi bình thường)
+const STAT_COLS = 'name,games,wins,top3,best_place,hands,last_played';
+export async function getStats(key) {
+  try { return (await rest(`poker_users?name_key=eq.${encodeURIComponent(key)}&select=${STAT_COLS}`))[0] || null; } catch { return null; }
+}
+export async function topPlayers() {
+  try { return await rest(`poker_users?select=${STAT_COLS}&games=gt.0&order=wins.desc,top3.desc,games.asc&limit=20`); } catch { return null; }
+}
+
 // ---------- Bàn chơi ----------
 export const getRoom = async (code) => (await rest(`poker_rooms?code=eq.${code}&select=*`))[0] || null;
 export const insertRoom = (row) => rest('poker_rooms', { method: 'POST', body: row, prefer: 'return=minimal' });
