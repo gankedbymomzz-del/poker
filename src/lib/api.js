@@ -7,8 +7,22 @@ const write = (k, v) => { try { if (v == null) localStorage.removeItem(k); else 
 
 export const loadPlayer = () => read(PLAYER_KEY);
 export const savePlayer = (p) => write(PLAYER_KEY, p);
-export const loadRoom = () => read(ROOM_KEY);
-export const saveRoom = (code) => write(ROOM_KEY, code);
+// Bàn đang chơi: { code, invite } (bản cũ chỉ lưu mã bàn)
+export const loadRoom = () => { const r = read(ROOM_KEY); return typeof r === 'string' ? { code: r } : r; };
+export const saveRoom = (room) => write(ROOM_KEY, room);
+
+// Link mời dạng ?ban=1234&moi=xxxx
+export function readInviteFromUrl() {
+  try {
+    const q = new URLSearchParams(window.location.search);
+    const code = (q.get('ban') || '').replace(/\D/g, '').slice(0, 4);
+    const invite = q.get('moi') || '';
+    if (code.length !== 4 || !invite) return null;
+    window.history.replaceState(null, '', window.location.pathname); // xoá khỏi thanh địa chỉ
+    return { code, invite };
+  } catch { return null; }
+}
+export const inviteLink = (code, invite) => `${window.location.origin}/?ban=${code}&moi=${encodeURIComponent(invite)}`;
 
 export async function call(action, payload = {}) {
   const p = loadPlayer();

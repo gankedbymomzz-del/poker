@@ -62,25 +62,47 @@ function* choose(arr, k, start = 0, pick = []) {
   for (let i = start; i <= arr.length - (k - pick.length); i += 1) { pick.push(arr[i]); yield* choose(arr, k, i + 1, pick); pick.pop(); }
 }
 
-// Xếp tự động: thử mọi cách hợp lệ, chọn cách tốt nhất theo điểm ước lượng
+// Xếp tự động: thử mọi cách hợp lệ, chọn cách tốt nhất theo điểm ước lượng.
+// Chấm trước mỗi bộ 5 lá / 3 lá đúng 1 lần rồi tra bằng mảng đánh số theo bit (13 lá → 8.192 ô).
 const MAX = 15 ** 6;
+const PICK5_OF_8 = [...choose([0, 1, 2, 3, 4, 5, 6, 7], 5)];
 export function autoArrange(hand) {
-  let best = null;
-  for (const bot of choose(hand, 5)) {
-    const rest = hand.filter((c) => !bot.includes(c));
-    const eb = eval5(bot);
-    for (const mid of choose(rest, 5)) {
-      const em = eval5(mid);
-      if (em.score > eb.score) continue;
-      const top = rest.filter((c) => !mid.includes(c));
-      const et = eval3(top);
-      if (et.score > em.score) continue;
-      const v = eb.score / MAX + 1.25 * (em.score / MAX) + 1.6 * (et.score / MAX)
-        + (et.cat === 3 ? 0.6 : 0) + (em.cat === 6 ? 0.25 : 0);
-      if (!best || v > best.v) best = { v, top, mid, bot };
+  const n = hand.length;
+  const idx = hand.map((_, i) => i);
+  const size = 1 << n;
+  const s5 = new Float64Array(size); const c5 = new Int8Array(size);
+  const s3 = new Float64Array(size); const c3 = new Int8Array(size);
+  const masks5 = [];
+  for (const ids of choose(idx, 5)) {
+    const m = ids.reduce((x, i) => x | (1 << i), 0);
+    const e = eval5(ids.map((i) => hand[i]));
+    s5[m] = e.score; c5[m] = e.cat; masks5.push(m);
+  }
+  for (const ids of choose(idx, 3)) {
+    const m = ids.reduce((x, i) => x | (1 << i), 0);
+    const e = eval3(ids.map((i) => hand[i]));
+    s3[m] = e.score; c3[m] = e.cat;
+  }
+  const full = size - 1;
+  const rest = new Int32Array(8);
+  let best = -1; let bb = 0; let bm = 0;
+  for (const mb of masks5) {
+    const sb = s5[mb];
+    let k = 0;
+    for (let i = 0; i < n; i += 1) if (!(mb & (1 << i))) rest[k++] = 1 << i;
+    for (const p of PICK5_OF_8) {
+      const mm = rest[p[0]] | rest[p[1]] | rest[p[2]] | rest[p[3]] | rest[p[4]];
+      const sm = s5[mm];
+      if (sm > sb) continue;
+      const mt = full & ~mb & ~mm;
+      const st = s3[mt];
+      if (st > sm) continue;
+      const v = sb / MAX + 1.25 * (sm / MAX) + 1.6 * (st / MAX) + (c3[mt] === 3 ? 0.6 : 0) + (c5[mm] === 6 ? 0.25 : 0);
+      if (v > best) { best = v; bb = mb; bm = mm; }
     }
   }
-  return { top: best.top, mid: best.mid, bot: best.bot };
+  const pick = (m) => hand.filter((_, i) => m & (1 << i));
+  return { top: pick(full & ~bb & ~bm), mid: pick(bm), bot: pick(bb) };
 }
 
 export function create({ players, now = Date.now(), options = {} }) {

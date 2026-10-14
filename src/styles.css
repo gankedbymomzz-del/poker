@@ -552,3 +552,9 @@ input { user-select: text; -webkit-user-select: text; }
 .loan-item > div { display: flex; gap: 6px; flex-shrink: 0; }
 .loan-item.debt { border-left: 3px solid #ff7a70; }
 .loan-item.credit { border-left: 3px solid #52e08a; }
+
+/* Link mời */
+.invite-note { margin: 4px 0 0; padding: 8px 14px; border-radius: 12px; background: rgba(224, 189, 99, .14); border: 1px solid rgba(224, 189, 99, .4); font-size: 14px; }
+.invite-note b { color: var(--gold); }
+.invite-btn { margin-top: 6px; }
+.note b { color: var(--gold); }

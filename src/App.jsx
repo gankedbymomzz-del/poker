@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { call, loadPlayer, savePlayer, loadRoom, saveRoom } from './lib/api.js';
+import { call, loadPlayer, savePlayer, loadRoom, saveRoom, readInviteFromUrl } from './lib/api.js';
 import { unlock } from './lib/sfx.js';
 import Card from './Card.jsx';
 import PracticeGame from './PracticeGame.jsx';
@@ -12,7 +12,6 @@ export default function App() {
   const [screen, setScreen] = useState('home'); // home | bots | online
   const [room, setRoom] = useState(null);
   const [name, setName] = useState('');
-  const [code, setCode] = useState('');
   const [bots, setBots] = useState(3);
   const [ptype, setPtype] = useState('poker');
   const [fast, setFast] = useState(false);
@@ -21,6 +20,8 @@ export default function App() {
   const [msg, setMsg] = useState('');
   const [stats, setStats] = useState(null);
   const [leaders, setLeaders] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [invite] = useState(readInviteFromUrl); // mở từ link mời
 
   // Trình duyệt chỉ cho phát âm thanh sau lần chạm đầu tiên
   useEffect(() => {
@@ -29,35 +30,39 @@ export default function App() {
     return () => window.removeEventListener('pointerdown', u);
   }, []);
 
-  // Tải lại trang giữa chừng → tự vào lại đúng bàn
+  // Mở từ link mời → vào thẳng bàn; tải lại trang giữa chừng → tự vào lại đúng bàn
   useEffect(() => {
+    if (!player) return;
+    if (invite) { enter('join', invite.code, false, invite.invite); return; }
     const saved = loadRoom();
-    if (player && saved) enter('join', saved, true);
+    if (saved?.code) enter('join', saved.code, true, saved.invite);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Thành tích của bạn
   useEffect(() => {
     if (!player || screen !== 'home') return;
-    call('me').then((r) => setStats(r.stats)).catch(() => setStats(null));
+    call('me').then((r) => { setStats(r.stats); setIsAdmin(!!r.isAdmin); }).catch(() => setStats(null));
   }, [player, screen]);
 
   const register = async () => {
     setBusy(true); setErr('');
     try {
-      const r = await call('register', { name: name.trim() });
+      const r = await call('register', { name: name.trim(), code: invite?.code, invite: invite?.invite });
       const p = { name: r.name, token: r.token };
       savePlayer(p);
       setPlayer(p);
+      if (invite) enter('join', invite.code, false, invite.invite);
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   };
 
-  async function enter(action, c, silent = false) {
+  async function enter(action, c, silent = false, inv = null) {
     setBusy(true); setErr(''); setMsg('');
     try {
-      const r = await call(action, c ? { code: c } : {});
-      saveRoom(r.room.code);
-      setRoom(r.room);
+      const r = await call(action, c ? { code: c, invite: inv } : {});
+      const myInvite = r.room.invite || inv || null;
+      saveRoom({ code: r.room.code, invite: myInvite });
+      setRoom({ ...r.room, myInvite });
       setScreen('online');
     } catch (e) {
       if (silent) saveRoom(null); else setErr(e.message);
@@ -73,7 +78,7 @@ export default function App() {
   const exit = (note) => { setScreen('home'); setRoom(null); if (typeof note === 'string') setMsg(note); };
 
   if (screen === 'bots') return <PracticeGame type={ptype} name={player?.name || 'Bạn'} bots={bots} fast={fast} onExit={exit} />;
-  if (screen === 'online' && room) return <OnlineGame initial={room} onExit={exit} />;
+  if (screen === 'online' && room) return <OnlineGame initial={room} invite={room.myInvite} onExit={exit} />;
 
   return (
     <div className="home">
@@ -86,8 +91,9 @@ export default function App() {
           <Card c="Ts" size="lg" className="f5" />
         </div>
         <p className="kicker">Poker · Bài cào · Xì dách · Tiến lên · Mậu binh</p>
-        <h1>Sòng bài <span>Nhà Số 7</span></h1>
-        <p className="lead">Tạo bàn, gửi mã cho bạn bè, chọn game và chơi cùng nhau. Chip ảo, chỉ để giải trí.</p>
+        <h1>Góc giải trí <span>Nhà Số 7</span></h1>
+        <p className="lead">Chơi bài cùng bạn bè qua link mời. Chip ảo, chỉ để giải trí.</p>
+        {invite && !player && <p className="invite-note">Bạn được mời vào bàn <b>{invite.code}</b>. Đặt tên để vào chơi.</p>}
       </div>
 
       {!player ? (
@@ -120,14 +126,19 @@ export default function App() {
 
           <div className="panel">
             <h2>Chơi với bạn bè</h2>
-            <button className="btn gold big" disabled={busy} onClick={() => enter('create')}>Tạo bàn mới</button>
-            <div className="or"><span>hoặc vào bàn có sẵn</span></div>
-            <div className="join">
-              <input value={code} inputMode="numeric" placeholder="Mã 4 số" aria-label="Mã bàn"
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                onKeyDown={(e) => e.key === 'Enter' && code.length === 4 && enter('join', code)} />
-              <button className="btn" disabled={busy || code.length !== 4} onClick={() => enter('join', code)}>Vào bàn</button>
-            </div>
+            {isAdmin ? (
+              <>
+                <button className="btn gold big" disabled={busy} onClick={() => enter('create')}>Mở bàn mới</button>
+                <p className="note left">Mở bàn xong, bấm <b>Sao chép link mời</b> ở phòng chờ rồi gửi cho mọi người.</p>
+              </>
+            ) : (
+              <p className="note left">Bàn chơi do quản trị viên mở. Hãy nhờ quản trị viên gửi <b>link mời</b>, bấm vào link là vào thẳng bàn.</p>
+            )}
+            {loadRoom()?.code && (
+              <button className="btn ghost" disabled={busy} onClick={() => { const s = loadRoom(); enter('join', s.code, false, s.invite); }}>
+                Quay lại bàn {loadRoom().code}
+              </button>
+            )}
           </div>
 
           <div className="panel">

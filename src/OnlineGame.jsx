@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { call, saveRoom } from './lib/api.js';
+import { call, saveRoom, inviteLink } from './lib/api.js';
 import { subscribeRoom } from './lib/realtime.js';
 import { seatPos } from './Table.jsx';
 import GameView from './games/GameView.jsx';
@@ -10,7 +10,7 @@ import Social from './Social.jsx';
 const ROUND_OPTS = [4, 8, 12];
 
 // Chơi phòng: máy chủ giữ bài, điện thoại chỉ nhận phần mình được xem
-export default function OnlineGame({ initial, onExit }) {
+export default function OnlineGame({ initial, invite, onExit }) {
   const [room, setRoom] = useState(initial);
   const [now, setNow] = useState(Date.now());
   const [busy, setBusy] = useState(false);
@@ -22,6 +22,7 @@ export default function OnlineGame({ initial, onExit }) {
   const roomRef = useRef(initial);
   const offset = useRef(initial.now - Date.now());
   const code = initial.code;
+  const [copied, setCopied] = useState(false);
 
   const apply = useCallback((r) => {
     if (!r) return;
@@ -30,14 +31,14 @@ export default function OnlineGame({ initial, onExit }) {
   }, []);
 
   const refresh = useCallback(async () => {
-    try { apply((await call('state', { code })).room); setErr(''); } catch (e) {
+    try { apply((await call('state', { code, invite })).room); setErr(''); } catch (e) {
       if (e.status === 404) { saveRoom(null); onExit('Bàn đã đóng'); } else setErr(e.message);
     }
   }, [code]);
 
   const doCall = async (action, extra = {}) => {
     setBusy(true); setErr('');
-    try { apply((await call(action, { code, ...extra })).room); } catch (e) { setErr(e.message); throw e; } finally { setBusy(false); }
+    try { apply((await call(action, { code, invite, ...extra })).room); } catch (e) { setErr(e.message); throw e; } finally { setBusy(false); }
   };
 
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, []);
@@ -67,6 +68,15 @@ export default function OnlineGame({ initial, onExit }) {
     const t = setTimeout(refresh, Math.max(200, wake - srvNow));
     return () => clearTimeout(t);
   }, [room.version, deadline, room.doneAt, roundDone]);
+
+  // Chủ bàn gửi link mời
+  const shareInvite = async () => {
+    const link = inviteLink(code, room.invite || invite);
+    try {
+      if (navigator.share) await navigator.share({ title: 'Mời vào bàn Nhà Số 7', text: `Vào bàn ${code} chơi cùng mình nhé`, url: link });
+      else { await navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+    } catch { /* người dùng huỷ chia sẻ */ }
+  };
 
   const leave = async () => {
     try { await call('leave', { code }); } catch { /* bỏ qua */ }
@@ -99,6 +109,7 @@ export default function OnlineGame({ initial, onExit }) {
     <>
       <button className="pill btn-pill" onClick={leave}>Rời bàn</button>
       <div className="pill">Bàn <b>{code}</b></div>
+      {room.invite && <button className="pill btn-pill" onClick={shareInvite}>{copied ? 'Đã chép link' : '🔗 Mời'}</button>}
       <div className={`pill live ${live === 'SUBSCRIBED' ? 'on' : ''}`} title={live === 'SUBSCRIBED' ? 'Cập nhật tức thì' : 'Đang dùng chế độ dự phòng'}>●</div>
       <button className="pill btn-pill badge-wrap" onClick={() => setPanel('chat')} aria-label="Trò chuyện">💬{unread > 0 && <i className="badge">{unread}</i>}</button>
       {chipGame && (
@@ -124,9 +135,12 @@ export default function OnlineGame({ initial, onExit }) {
         <div className="table-wrap">
           <div className="felt">
             <div className="center lobby-center">
-              <p className="kicker">Mã bàn</p>
-              <button className="code" onClick={() => navigator.clipboard?.writeText(code)} title="Chạm để sao chép">{code}</button>
+              <p className="kicker">Bàn số</p>
+              <div className="code">{code}</div>
               <p className="lead small">{meta.name} · {meta.min}–{meta.max} người</p>
+              {room.invite && (
+                <button className="btn gold small invite-btn" onClick={shareInvite}>{copied ? 'Đã sao chép link mời ✓' : 'Sao chép link mời'}</button>
+              )}
             </div>
             {room.seats.map((s, t) => (
               <div key={t} data-pid={s?.key} className={`seat lobby ${t === room.mySeat ? 'mine' : ''}`} style={seatPos((t - ref + 6) % 6, 6)}>

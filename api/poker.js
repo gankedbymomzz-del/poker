@@ -30,7 +30,15 @@ async function auth(b) {
   return { key, name: u.name };
 }
 
-const newState = (host) => ({ host, type: 'poker', rounds: null, seats: Array(SEATS).fill(null), game: null, map: [], doneAt: null, finishedAt: null, settings: SETTINGS });
+// ====== QUẢN TRỊ VIÊN ======
+// Biến môi trường ADMIN_NAMES = tên trong game của quản trị viên (nhiều tên cách nhau bởi dấu phẩy).
+// Chỉ quản trị viên được mở bàn. Người khác cần link mời (mã bàn + mã mời) mới ghi danh và vào bàn được.
+const ADMINS = new Set(String(process.env.ADMIN_NAMES || '').split(',').map((n) => keyOf(n)).filter(Boolean));
+const isAdmin = (key) => ADMINS.has(key);
+const newInvite = () => crypto.randomBytes(6).toString('base64url');
+const inviteOk = (st, b) => Boolean(st?.invite && b.invite && b.invite === st.invite);
+
+const newState = (host) => ({ host, invite: newInvite(), type: 'poker', rounds: null, seats: Array(SEATS).fill(null), game: null, map: [], doneAt: null, finishedAt: null, settings: SETTINGS });
 const statusOf = (st) => (!st.game ? 'lobby' : st.game.finished ? 'finished' : 'playing');
 
 // ====== CHAT & NÉM ICON ======
@@ -152,6 +160,7 @@ function view(row, meKey, now) {
     code: row.code, version: row.version, status: statusOf(st), now,
     type: st.type || 'poker', rounds: st.rounds || null,
     host: st.host, isHost: st.host === meKey,
+    invite: st.host === meKey || isAdmin(meKey) ? st.invite || null : null,
     seats: st.seats.map((s) => s && { key: s.key, name: s.name, away: !!s.away }),
     map: st.map, mySeat, myEngine,
     doneAt: st.doneAt, nextHandMs: nextMs(st.type), settings: st.settings,
@@ -181,6 +190,11 @@ export default async function handler(req, res) {
         if (b.token && u.token_hash === hash(b.token)) return send(res, 200, { name: u.name, token: b.token });
         return send(res, 409, { error: 'Tên này đã có người dùng, chọn tên khác' });
       }
+      if (!isAdmin(key)) {
+        const code = String(b.code || '').replace(/\D/g, '').slice(0, 4);
+        const room = code.length === 4 ? await getRoom(code) : null;
+        if (!inviteOk(room?.state, b)) return send(res, 403, { error: 'Cần link mời của quản trị viên để ghi danh' });
+      }
       const token = crypto.randomUUID();
       try { await insertUser({ name_key: key, name, token_hash: hash(token) }); } catch (e) {
         if (e.code === '23505') return send(res, 409, { error: 'Tên này vừa có người lấy, chọn tên khác' });
@@ -193,11 +207,12 @@ export default async function handler(req, res) {
     if (!me) return send(res, 401, { error: 'Phiên đăng nhập hết hạn, hãy ghi danh lại' });
 
     // ---------- Thành tích & Bảng vàng ----------
-    if (b.action === 'me') return send(res, 200, { stats: await getStats(me.key) });
+    if (b.action === 'me') return send(res, 200, { stats: await getStats(me.key), isAdmin: isAdmin(me.key) });
     if (b.action === 'leaders') return send(res, 200, { top: await topPlayers() });
 
     // ---------- Tạo bàn ----------
     if (b.action === 'create') {
+      if (!isAdmin(me.key)) return send(res, 403, { error: 'Chỉ quản trị viên mới mở bàn được' });
       cleanupRooms().catch(() => {});
       for (let i = 0; i < 12; i += 1) {
         const code = String(crypto.randomInt(1000, 10000));
@@ -218,12 +233,16 @@ export default async function handler(req, res) {
     let row;
     switch (b.action) {
       case 'state':
-        row = await mutate(code, (st) => progress(st, now));
+        row = await mutate(code, (st) => {
+          if (seatOf(st) < 0 && !isAdmin(me.key) && !inviteOk(st, b)) throw httpErr(403, 'Bạn không có quyền xem bàn này');
+          return progress(st, now);
+        });
         break;
 
       case 'join':
         row = await mutate(code, (st) => {
           if (seatOf(st) >= 0) { const s = st.seats[seatOf(st)]; if (!s.away) return false; s.away = false; return true; }
+          if (!isAdmin(me.key) && !inviteOk(st, b)) throw httpErr(403, 'Cần link mời của quản trị viên để vào bàn này');
           if (st.game && !st.game.finished) return false; // đang chơi → vào xem
           const free = st.seats.findIndex((s) => !s);
           if (free < 0) throw httpErr(409, 'Bàn đã đủ 6 người');
