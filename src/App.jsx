@@ -20,7 +20,10 @@ export default function App() {
   const [msg, setMsg] = useState('');
   const [stats, setStats] = useState(null);
   const [leaders, setLeaders] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [pin, setPin] = useState('');
+  const [adminSheet, setAdminSheet] = useState(false);
+  const [adminPass, setAdminPass] = useState('');
+  const [remember, setRemember] = useState(true);
   const [invite] = useState(readInviteFromUrl); // mở từ link mời
 
   // Trình duyệt chỉ cho phát âm thanh sau lần chạm đầu tiên
@@ -42,13 +45,13 @@ export default function App() {
   // Thành tích của bạn
   useEffect(() => {
     if (!player || screen !== 'home') return;
-    call('me').then((r) => { setStats(r.stats); setIsAdmin(!!r.isAdmin); }).catch(() => setStats(null));
+    call('me').then((r) => setStats(r.stats)).catch(() => setStats(null));
   }, [player, screen]);
 
   const register = async () => {
     setBusy(true); setErr('');
     try {
-      const r = await call('register', { name: name.trim(), code: invite?.code, invite: invite?.invite });
+      const r = await call('register', { name: name.trim(), pin });
       const p = { name: r.name, token: r.token };
       savePlayer(p);
       setPlayer(p);
@@ -56,19 +59,36 @@ export default function App() {
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   };
 
-  async function enter(action, c, silent = false, inv = null) {
+  async function enter(action, c, silent = false, inv = null, extra = {}) {
     setBusy(true); setErr(''); setMsg('');
     try {
-      const r = await call(action, c ? { code: c, invite: inv } : {});
+      const r = await call(action, c ? { code: c, invite: inv } : extra);
       const myInvite = r.room.invite || inv || null;
       saveRoom({ code: r.room.code, invite: myInvite });
       setRoom({ ...r.room, myInvite });
       setScreen('online');
+      return true;
     } catch (e) {
       if (silent) saveRoom(null); else setErr(e.message);
       if (e.status === 401) { savePlayer(null); setPlayer(null); }
+      return false;
     } finally { setBusy(false); }
   }
+
+  // Mở bàn: cần mật khẩu quản trị (có thể ghi nhớ trên máy này)
+  const ADMIN_KEY = 'poker-admin';
+  const openTable = async (pass) => {
+    const p = pass ?? (() => { try { return localStorage.getItem(ADMIN_KEY); } catch { return null; } })();
+    if (!p) { setAdminSheet(true); return; }
+    const ok = await enter('create', null, false, null, { adminPass: p });
+    if (ok) {
+      setAdminSheet(false); setAdminPass('');
+      try { if (remember) localStorage.setItem(ADMIN_KEY, p); } catch { /* bỏ qua */ }
+    } else if (pass == null) {
+      try { localStorage.removeItem(ADMIN_KEY); } catch { /* bỏ qua */ }
+      setAdminSheet(true); // mật khẩu đã lưu không còn đúng → hỏi lại
+    }
+  };
 
   const openLeaders = async () => {
     setLeaders({ loading: true });
@@ -99,11 +119,18 @@ export default function App() {
       {!player ? (
         <div className="panel">
           <label className="field">
-            <span>Đặt tên để vào bàn</span>
-            <input value={name} maxLength={14} onChange={(e) => setName(e.target.value)} placeholder="Tên hiển thị"
-              onKeyDown={(e) => e.key === 'Enter' && name.trim().length >= 2 && register()} />
+            <span>Tên của bạn</span>
+            <input value={name} maxLength={14} onChange={(e) => setName(e.target.value)} placeholder="Tên hiển thị" autoComplete="username" />
           </label>
-          <button className="btn gold big" disabled={busy || name.trim().length < 2} onClick={register}>Ghi danh</button>
+          <label className="field">
+            <span>Mã PIN (4–8 số)</span>
+            <input value={pin} inputMode="numeric" type="password" maxLength={8} placeholder="Tự đặt, dùng để đăng nhập máy khác"
+              autoComplete="current-password"
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+              onKeyDown={(e) => e.key === 'Enter' && name.trim().length >= 2 && pin.length >= 4 && register()} />
+          </label>
+          <p className="note left">Lần đầu: đặt tên và PIN mới. Lần sau, ở máy nào cũng đăng nhập bằng đúng tên và PIN đó.</p>
+          <button className="btn gold big" disabled={busy || name.trim().length < 2 || pin.length < 4} onClick={register}>Vào chơi</button>
         </div>
       ) : (
         <>
@@ -113,7 +140,7 @@ export default function App() {
             </div>
             <div className="who">
               <b>{player.name}</b>
-              <button className="link" onClick={() => { savePlayer(null); setPlayer(null); setStats(null); }}>Đổi tên</button>
+              <button className="link" onClick={() => { savePlayer(null); setPlayer(null); setStats(null); setPin(''); }}>Đăng xuất</button>
             </div>
             <div className="stats">
               <div><b>{stats?.games ?? 0}</b><span>Giải</span></div>
@@ -126,14 +153,8 @@ export default function App() {
 
           <div className="panel">
             <h2>Chơi với bạn bè</h2>
-            {isAdmin ? (
-              <>
-                <button className="btn gold big" disabled={busy} onClick={() => enter('create')}>Mở bàn mới</button>
-                <p className="note left">Mở bàn xong, bấm <b>Sao chép link mời</b> ở phòng chờ rồi gửi cho mọi người.</p>
-              </>
-            ) : (
-              <p className="note left">Bàn chơi do quản trị viên mở. Hãy nhờ quản trị viên gửi <b>link mời</b>, bấm vào link là vào thẳng bàn.</p>
-            )}
+            <button className="btn gold big" disabled={busy} onClick={() => openTable()}>Mở bàn mới</button>
+            <p className="note left">Mở bàn cần <b>mật khẩu quản trị</b>. Người khác vào bàn bằng <b>link mời</b> do chủ bàn gửi.</p>
             {loadRoom()?.code && (
               <button className="btn ghost" disabled={busy} onClick={() => { const s = loadRoom(); enter('join', s.code, false, s.invite); }}>
                 Quay lại bàn {loadRoom().code}
@@ -175,6 +196,23 @@ export default function App() {
       {err && <p className="err">{err}</p>}
       {msg && <p className="waiting">{msg}</p>}
       <p className="note">Chip ảo, chỉ để giải trí. Không có giá trị quy đổi.</p>
+
+      {adminSheet && (
+        <div className="sheet-wrap" onClick={() => setAdminSheet(false)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <h3>Mật khẩu quản trị</h3>
+            <input className="pass-input" type="password" value={adminPass} autoFocus placeholder="Nhập mật khẩu để mở bàn"
+              onChange={(e) => setAdminPass(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && adminPass && openTable(adminPass)} />
+            <label className="toggle">
+              <span>Ghi nhớ trên máy này<small>Lần sau mở bàn không cần nhập lại</small></span>
+              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+            </label>
+            {err && <p className="err">{err}</p>}
+            <button className="btn gold" disabled={busy || !adminPass} onClick={() => openTable(adminPass)}>Mở bàn</button>
+            <button className="btn ghost" onClick={() => setAdminSheet(false)}>Huỷ</button>
+          </div>
+        </div>
+      )}
 
       {leaders && (
         <div className="sheet-wrap" onClick={() => setLeaders(null)}>

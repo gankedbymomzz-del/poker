@@ -34,6 +34,7 @@ async function rest(path, { method = 'GET', body, prefer } = {}) {
 // ---------- Người chơi ----------
 export const getUser = async (key) => (await rest(`poker_users?name_key=eq.${encodeURIComponent(key)}&select=*`))[0] || null;
 export const insertUser = (row) => rest('poker_users', { method: 'POST', body: row, prefer: 'return=minimal' });
+export const updateUser = (key, patch) => rest(`poker_users?name_key=eq.${encodeURIComponent(key)}`, { method: 'PATCH', body: patch, prefer: 'return=minimal' });
 
 export const rpc = (fn, args) => rest(`rpc/${fn}`, { method: 'POST', body: args });
 
@@ -66,9 +67,14 @@ export async function saveRoom(code, version, patch) {
   return rows[0];
 }
 
-// Dọn bàn bỏ hoang quá 1 ngày
+export async function deleteRoom(code) {
+  await rest(`poker_rooms?code=eq.${code}`, { method: 'DELETE', prefer: 'return=minimal' });
+  await rest(`poker_signals?code=eq.${code}`, { method: 'DELETE', prefer: 'return=minimal' });
+}
+
+// Dọn bàn bỏ quên: không có hoạt động nào quá 30 phút
 export async function cleanupRooms() {
-  const before = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const before = new Date(Date.now() - 30 * 60 * 1000).toISOString();
   await rest(`poker_rooms?updated_at=lt.${before}`, { method: 'DELETE', prefer: 'return=minimal' });
   await rest(`poker_signals?updated_at=lt.${before}`, { method: 'DELETE', prefer: 'return=minimal' });
 }

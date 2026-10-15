@@ -6,6 +6,36 @@ Texas Hold'em No-Limit, thể thức Sit & Go cho 2–6 người. Chip ảo, ch�
 
 ---
 
+## Cập nhật: mật khẩu quản trị, đăng nhập tên + PIN, tự huỷ bàn
+
+### Cài đặt 1 lần (bắt buộc)
+
+Vercel → project → **Settings → Environment Variables**:
+
+| Tên | Giá trị |
+|---|---|
+| `ADMIN_PASSWORD` | Mật khẩu để mở bàn, **nên dài từ 8 ký tự**, ví dụ `NhaSo7@2026` |
+
+Xoá biến `ADMIN_NAMES` cũ nếu có (không dùng nữa). Save → **Deployments → Redeploy**.
+
+### Đăng nhập
+
+- Lần đầu: đặt **tên + mã PIN** (4–8 số).
+- Lần sau, ở **máy nào cũng được**, nhập đúng tên + PIN là vào.
+- Tài khoản tạo trước bản này: nhập tên cũ + PIN mới là nhận lại được (kèm thành tích).
+
+### Mở bàn và mời
+
+Bấm **Mở bàn mới** → nhập mật khẩu quản trị (có thể tick "Ghi nhớ trên máy này") → ở phòng chờ bấm **Sao chép link mời** gửi mọi người. Người khác vào bàn bằng link mời; đoán mã 4 số mà không có link thì không vào được.
+
+### Bàn tự huỷ
+
+| Trường hợp | Kết quả |
+|---|---|
+| Một người rời giữa ván | Bàn vẫn chạy, máy tự bỏ bài thay người đó |
+| **Người cuối cùng rời bàn** | Bàn huỷ ngay, không chạy ẩn |
+| Không có hoạt động quá 30 phút (mọi người tắt máy mà không bấm Rời bàn) | Tự dọn |
+
 ## Cập nhật: chat, ném icon, vay chip
 
 Không cần chạy SQL. Upload thư mục mới lên GitHub là xong.

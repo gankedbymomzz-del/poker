@@ -76,9 +76,10 @@ export default function OnlineGame({ initial, invite, onExit }) {
   };
 
   const leave = async () => {
-    try { await call('leave', { code }); } catch { /* bỏ qua */ }
+    let closed = false;
+    try { closed = (await call('leave', { code, invite })).closed; } catch { /* bỏ qua */ }
     saveRoom(null);
-    onExit();
+    onExit(closed ? `Bàn ${code} đã đóng vì không còn ai chơi` : undefined);
   };
 
   const myKey = room.mySeat >= 0 ? room.seats[room.mySeat]?.key : null;

@@ -572,3 +572,4 @@ input { user-select: text; -webkit-user-select: text; }
 .invite-note b { color: var(--gold); }
 .invite-btn { margin-top: 6px; }
 .note b { color: var(--gold); }
+.pass-input { padding: 12px 14px; border-radius: 12px; border: 1.5px solid rgba(224, 189, 99, .35); background: rgba(0, 0, 0, .35); color: var(--text); font: inherit; font-size: 17px; }

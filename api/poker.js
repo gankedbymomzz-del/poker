@@ -7,7 +7,7 @@
 // Nguyên tắc: máy chủ nắm toàn bộ trạng thái (kể cả bộ bài), mỗi người chỉ nhận phần mình được xem.
 import crypto from 'node:crypto';
 import {
-  hasDb, publicConfig, getUser, insertUser, getRoom, insertRoom, saveRoom, cleanupRooms, rpc, getStats, topPlayers,
+  hasDb, publicConfig, getUser, insertUser, updateUser, getRoom, insertRoom, saveRoom, deleteRoom, cleanupRooms, rpc, getStats, topPlayers,
   NAME_RE, cleanName, keyOf, hash, serverRng,
 } from './_lib/db.js';
 import { gameOf, GAMES } from '../engine/games/index.js';
@@ -26,15 +26,27 @@ async function auth(b) {
   if (!b.token) return null;
   const key = keyOf(b.name);
   const u = await getUser(key);
-  if (!u || u.token_hash !== hash(b.token)) return null;
-  return { key, name: u.name };
+  if (!u) return null;
+  const ok = u.token_hash.startsWith('p:') ? u.token_hash === pinHash(key, b.token) : u.token_hash === hash(b.token);
+  return ok ? { key, name: u.name } : null;
 }
 
-// ====== QUẢN TRỊ VIÊN ======
-// Biến môi trường ADMIN_NAMES = tên trong game của quản trị viên (nhiều tên cách nhau bởi dấu phẩy).
-// Chỉ quản trị viên được mở bàn. Người khác cần link mời (mã bàn + mã mời) mới ghi danh và vào bàn được.
-const ADMINS = new Set(String(process.env.ADMIN_NAMES || '').split(',').map((n) => keyOf(n)).filter(Boolean));
-const isAdmin = (key) => ADMINS.has(key);
+// ====== MẬT KHẨU QUẢN TRỊ ======
+// Biến môi trường ADMIN_PASSWORD: ai nhập đúng mật khẩu này mới mở được bàn.
+// Người khác vào bàn bằng link mời (mã bàn + mã mời) do chủ bàn gửi.
+function adminOk(pass) {
+  const real = String(process.env.ADMIN_PASSWORD || '');
+  if (!real || !pass) return false;
+  const a = crypto.createHash('sha256').update(real).digest();
+  const b = crypto.createHash('sha256').update(String(pass)).digest();
+  return crypto.timingSafeEqual(a, b);
+}
+
+// ====== ĐĂNG NHẬP: TÊN + MÃ PIN ======
+// Lưu dạng 'p:' + hash(tên + PIN) → đăng nhập được trên mọi máy bằng tên + PIN.
+// Tài khoản cũ (chưa có PIN) được nhận lại bằng PIN mới ở lần đăng nhập kế tiếp.
+const PIN_RE = /^\d{4,8}$/;
+const pinHash = (key, pin) => `p:${hash(`${key}:${pin}`)}`;
 const newInvite = () => crypto.randomBytes(6).toString('base64url');
 const inviteOk = (st, b) => Boolean(st?.invite && b.invite && b.invite === st.invite);
 
@@ -95,6 +107,7 @@ function applyTransfers(st) {
 function progress(st, now) {
   const G = gameOf(st.type);
   let changed = false;
+  if (st.game && !st.seats.some((s) => s && !s.away)) return false; // cả bàn đã rời: dừng hẳn, không chạy ẩn
   for (let guard = 0; st.game && !st.game.finished && guard < 80; guard += 1) {
     if (G.roundDone(st.game)) {
       if (st.transfers?.length && applyTransfers(st)) changed = true;
@@ -160,7 +173,7 @@ function view(row, meKey, now) {
     code: row.code, version: row.version, status: statusOf(st), now,
     type: st.type || 'poker', rounds: st.rounds || null,
     host: st.host, isHost: st.host === meKey,
-    invite: st.host === meKey || isAdmin(meKey) ? st.invite || null : null,
+    invite: st.host === meKey ? st.invite || null : null,
     seats: st.seats.map((s) => s && { key: s.key, name: s.name, away: !!s.away }),
     map: st.map, mySeat, myEngine,
     doneAt: st.doneAt, nextHandMs: nextMs(st.type), settings: st.settings,
@@ -184,35 +197,36 @@ export default async function handler(req, res) {
     if (b.action === 'register') {
       const name = cleanName(b.name);
       if (!NAME_RE.test(name)) return send(res, 400, { error: 'Tên dài 2–14 ký tự, chỉ gồm chữ, số, khoảng trắng' });
+      const pin = String(b.pin || '');
+      if (!PIN_RE.test(pin)) return send(res, 400, { error: 'Mã PIN gồm 4–8 chữ số' });
       const key = keyOf(name);
       const u = await getUser(key);
       if (u) {
-        if (b.token && u.token_hash === hash(b.token)) return send(res, 200, { name: u.name, token: b.token });
-        return send(res, 409, { error: 'Tên này đã có người dùng, chọn tên khác' });
+        if (u.token_hash.startsWith('p:')) {
+          if (u.token_hash !== pinHash(key, pin)) return send(res, 401, { error: 'Sai mã PIN của tên này' });
+        } else {
+          await updateUser(key, { token_hash: pinHash(key, pin) }); // tài khoản cũ: nhận lại bằng PIN
+        }
+        return send(res, 200, { name: u.name, token: pin });
       }
-      if (!isAdmin(key)) {
-        const code = String(b.code || '').replace(/\D/g, '').slice(0, 4);
-        const room = code.length === 4 ? await getRoom(code) : null;
-        if (!inviteOk(room?.state, b)) return send(res, 403, { error: 'Cần link mời của quản trị viên để ghi danh' });
-      }
-      const token = crypto.randomUUID();
-      try { await insertUser({ name_key: key, name, token_hash: hash(token) }); } catch (e) {
+      try { await insertUser({ name_key: key, name, token_hash: pinHash(key, pin) }); } catch (e) {
         if (e.code === '23505') return send(res, 409, { error: 'Tên này vừa có người lấy, chọn tên khác' });
         throw e;
       }
-      return send(res, 200, { name, token });
+      return send(res, 200, { name, token: pin });
     }
 
     const me = await auth(b);
     if (!me) return send(res, 401, { error: 'Phiên đăng nhập hết hạn, hãy ghi danh lại' });
 
     // ---------- Thành tích & Bảng vàng ----------
-    if (b.action === 'me') return send(res, 200, { stats: await getStats(me.key), isAdmin: isAdmin(me.key) });
+    if (b.action === 'me') return send(res, 200, { stats: await getStats(me.key) });
     if (b.action === 'leaders') return send(res, 200, { top: await topPlayers() });
 
     // ---------- Tạo bàn ----------
     if (b.action === 'create') {
-      if (!isAdmin(me.key)) return send(res, 403, { error: 'Chỉ quản trị viên mới mở bàn được' });
+      if (!process.env.ADMIN_PASSWORD) return send(res, 503, { error: 'Chưa đặt mật khẩu quản trị (ADMIN_PASSWORD) trên Vercel' });
+      if (!adminOk(b.adminPass)) return send(res, 403, { error: 'Sai mật khẩu quản trị' });
       cleanupRooms().catch(() => {});
       for (let i = 0; i < 12; i += 1) {
         const code = String(crypto.randomInt(1000, 10000));
@@ -234,15 +248,16 @@ export default async function handler(req, res) {
     switch (b.action) {
       case 'state':
         row = await mutate(code, (st) => {
-          if (seatOf(st) < 0 && !isAdmin(me.key) && !inviteOk(st, b)) throw httpErr(403, 'Bạn không có quyền xem bàn này');
+          if (seatOf(st) < 0 && !inviteOk(st, b)) throw httpErr(403, 'Bạn không có quyền xem bàn này');
           return progress(st, now);
         });
         break;
 
       case 'join':
+        cleanupRooms().catch(() => {});
         row = await mutate(code, (st) => {
           if (seatOf(st) >= 0) { const s = st.seats[seatOf(st)]; if (!s.away) return false; s.away = false; return true; }
-          if (!isAdmin(me.key) && !inviteOk(st, b)) throw httpErr(403, 'Cần link mời của quản trị viên để vào bàn này');
+          if (!inviteOk(st, b)) throw httpErr(403, 'Cần link mời của chủ bàn để vào bàn này');
           if (st.game && !st.game.finished) return false; // đang chơi → vào xem
           const free = st.seats.findIndex((s) => !s);
           if (free < 0) throw httpErr(409, 'Bàn đã đủ 6 người');
@@ -310,7 +325,8 @@ export default async function handler(req, res) {
         });
         break;
 
-      case 'leave':
+      case 'leave': {
+        let empty = false;
         row = await mutate(code, (st) => {
           const i = seatOf(st);
           if (i < 0) return false;
@@ -320,10 +336,13 @@ export default async function handler(req, res) {
             const next = st.seats.find((s) => s && !s.away);
             if (next) st.host = next.key;
           }
-          progress(st, now);
+          empty = !st.seats.some((s) => s && !s.away); // không còn ai đang ngồi chơi
+          if (!empty) progress(st, now);
           return true;
         });
-        return send(res, 200, { left: true });
+        if (empty) await deleteRoom(code).catch(() => {});
+        return send(res, 200, { left: true, closed: empty });
+      }
 
       case 'back':
         row = await mutate(code, (st) => {
